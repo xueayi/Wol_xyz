@@ -1,0 +1,9 @@
+data/
+.git/
+*.pyc
+__pycache__/
+node_modules/
+frontend/dist/
+*.log
+.env
+.fernet_key

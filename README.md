@@ -1,151 +1,116 @@
-# Wake On Mijia (wom)
+# XiaoXue WoL - 局域网设备管理
 
-通过订阅巴法云主题并接收控制消息，在本地网络广播 WOL 魔术包以唤醒指定设备，并支持ssh实现Windows远程关机。项目提供 systemd 与 SysV init 两种安装方式，支持自动重连、心跳与日志轮转，适合守护进程部署。
+一个轻量级的局域网设备远程管理工具，提供 Web 管理面板，支持 Wake-on-LAN 远程开机、SSH 远程关机、设备状态监控、定时任务和多渠道通知。
 
 ## 功能特性
 
-- 连接 `bemfa.com` 并订阅指定主题，收到 `on` 指令后发送 WOL 魔术包
-- 自动重连与心跳维持（30 秒 `ping`），健壮性更好
-- 日志写入 `wol.log` 并进行 5MB 大小轮转
-- 支持 systemd 与 SysV init 安装，安装脚本自动判断环境
-- `config.ini` 管理用户参数，无需改动代码
-- 基于Windows OpenSSH Server的远程关机
-
-## 目录结构
-
-- `main.py`：守护进程入口，网络连接与 WOL 逻辑
-- `config.ini`：用户参数配置（服务器、UID、主题、MAC）
-- `install.sh`：安装脚本，自动选择 systemd 或 init，并提示输入 `main.py` 路径
+- **多设备管理**：通过卡片式界面管理所有局域网设备
+- **设备分组**：按办公设备、家庭设备等自定义分类
+- **实时状态监控**：ICMP Ping 定期检测设备在线状态，WebSocket 实时推送
+- **远程开机**：WOL 魔术包唤醒（需目标设备开启 WOL）
+- **远程关机**：SSH 连接执行关机命令（支持密码认证）
+- **定时任务**：Cron 表达式驱动的自动开关机
+- **外部触发源**：
+  - 巴法云（Bemfa）TCP 协议 — 支持米家/小爱/Home Assistant
+  - HTTP API Token — 通用 REST 接口
+  - MQTT — IoT 标准协议
+- **通知渠道**：邮件（SMTP）和通用 Webhook（内置飞书/企业微信模板），支持多实例
+- **操作日志**：记录所有操作的成功/失败详情
 
 ## 快速开始
 
-1. 准备环境
-   - 具有 `python3` 的 Linux 主机
-   - Linux 主机可访问外网网络（连接 `bemfa.com:8344`）
-   - 目标控制的电脑设备网卡支持 WOL
-2. 在巴法云平台创建主题
-3. 配置参数
-   - 编辑 `config.ini`：
+### Docker 部署（推荐）
 
-     ```ini
-     [server]
-     ip=bemfa.com
-     port=8344
+```bash
+git clone https://github.com/xueayi/XiaoXue_WoL.git
+cd XiaoXue_WoL
+docker compose up -d
+```
 
-     [auth]
-     uid=<巴法云分配给你的私钥>
+访问 `http://<宿主机IP>:39090`，默认账号 `admin` / `admin`。
 
-     [topic]
-     name=<在巴法云中添加的主题>
+> **重要**：使用 `network_mode: host` 确保 WOL 广播和局域网扫描正常工作。
 
-     [device]
-     mac=<你的设备MAC，如 CC:28:AA:04:00:53>
-     ip=<你的设备IP，如 192.168.1.100>
-     user=<你的设备ssh登录用户名>
-     password=<你的设备ssh登录密码>
-     ```
+### 环境变量
 
-   - 其中uid为巴法云分配给你的私钥
-   - name是巴法云创建的TCP设备云的主题名称（以三位数字006结尾，006代表开关类型）
-   - mac是你的目标远程开机设备MAC地址，用于发送WOL魔术包远程开机。
-   - 目标主机需要开启bios的wol相关唤醒功能，在设备管理器中右键打开网卡属性，在高级选项卡打开“魔术封包唤醒”，在电源管理选项卡中将“允许此设备唤醒计算机”勾选上。
-   - ip,user,password是你的设备ssh登录的ip,用户名,密码，如不需要远程关机可以不设置
-   - 在powershell中用`whoami`可以查看自己的用户名
-   - 如果是微软账户登录的，ssh的登录密码为微软账户密码，否则为Windows本地密码
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `WOM_WEB_PORT` | `39090` | Web 面板端口 |
+| `WOM_ADMIN_USERNAME` | `admin` | 管理员用户名 |
+| `WOM_ADMIN_PASSWORD` | `admin` | 管理员初始密码 |
+| `WOM_SECRET_KEY` | 随机值 | JWT 签名密钥（生产环境请修改） |
+| `WOM_PING_INTERVAL` | `60` | Ping 检测间隔（秒） |
 
-4. 远程关机配置（如不需要设置关机可以跳过）
+### 本地开发
 
-   - 在 Windows 启用 OpenSSH Server，使 Linux 主机可通过 SSH 执行关机命令。
-   - 进入 “设置 → 系统 → 可选功能 → 添加功能”，安装 **OpenSSH Server**。
-   - 管理员 PowerShell 启动并设置自启：
+```bash
+# 后端
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 39090
 
-   ```powershell
-   Start-Service sshd
-   Set-Service sshd -StartupType Automatic
-   ```
+# 前端
+cd frontend
+npm install
+npm run dev
+```
 
-   - 放行防火墙端口：
+## 目标设备配置
 
-   ```powershell
-   New-NetFirewallRule -Name sshd -Protocol TCP -LocalPort 22 -Action Allow
-   ```
+### 远程开机（WOL）
 
-5. 在Linux主机安装本服务
-   - 执行：`sudo bash install.sh`或者`./install.sh`
-   - 按提示输入 `main.py` 的绝对路径，例如：`/root/bemfa/wol/main.py`
-   - 脚本将自动：
-     - 若支持 systemd：生成并安装 `wom.service`，启用并启动
-     - 若不支持 systemd：生成 `/etc/init.d/wom`，注册并启动
-   - 若需要远程关机服务，请确保系统有以下环境：
-     - ssh连接远端主机的环境，如openssh-client
-     - sshpass：用于在脚本中自动输入ssh密码，安装命令如`apt install sshpass`，`opkg install sshpass`
+#### Windows
 
-6. 验证运行
-   - systemd：
-     - 查看状态：`sudo systemctl status wom`
-     - 查看日志：`journalctl -u wom -f`
-   - init：
-     - 查看状态：`/etc/init.d/wom status`
-     - 日志：`/var/log/wom.log`
+1. **BIOS**：启用 Wake on LAN / PCI-E 唤醒
+2. **设备管理器**：网卡属性 → 电源管理 → 允许唤醒；高级 → 启用「魔术封包唤醒」
+3. **关闭快速启动**：控制面板 → 电源选项
 
-7. 在第三方平台添加
-   - 米家app：
-     - 在米家app中绑定巴法云平台
-     - 如果有小爱音箱可以创建小爱音箱的"自定义指令"，从而添加到米家“自动化”任务触发
-     - 如果没有小爱音箱，直接使用小爱同学命令控制，区别是不能添加到米家“自动化”
-   - home assistant
-   - 其他支持连接巴法云的平台
+#### Linux
 
-## 配置说明
+1. **BIOS**：启用 Wake on LAN
+2. **安装 ethtool**：`sudo apt install ethtool`
+3. **启用 WoL**：`sudo ethtool -s eth0 wol g`（`eth0` 替换为实际网卡名）
+4. **持久化**：编辑 `/etc/network/interfaces` 或创建 systemd 服务使其开机生效
 
-- `server.ip` / `server.port`：巴法云服务器地址与端口
-- `auth.uid`：你的 UID，请替换为自己的值
-- `topic.name`：订阅主题名，控制消息形如 `topic=<name>&msg=on`
-- `device.mac`：被唤醒设备的 MAC 地址，支持 `AA:BB:CC:DD:EE:FF`
+#### macOS
 
-## 服务管理
+1. 系统设置 → 节能 → 勾选「唤醒以供网络访问」
+2. 仅支持有线以太网连接，Wi-Fi 下 WoL 不可用
 
-- systemd
-  - 启动：`sudo systemctl start wom`
-  - 重启：`sudo systemctl restart wom`
-  - 开机自启：`sudo systemctl enable wom`
-  - 停止：`sudo systemctl stop wom`
-  - 日志：`journalctl -u wom -f`
-- init
-  - 启动：`/etc/init.d/wom start`
-  - 重启：`/etc/init.d/wom restart`
-  - 停止：`/etc/init.d/wom stop`
-  - 开机自启：`/etc/init.d/bemfa_wol enable`
+### 远程关机（SSH）
 
-## 日志与排错
+1. **Windows**：启用 OpenSSH Server（设置 → 应用 → 可选功能）
+2. **Linux / macOS**：通常自带 SSH，确保 sshd 已启用
+3. 确保 SSH 端口 22 未被防火墙阻止
+4. 在 Web 面板中启用远程关机并填写 SSH 凭据
 
-- 业务日志：`wol.log`（与 `main.py` 同目录），超过 5MB 轮转到 `wol.log.bak`
-- systemd：使用 `journal`，查看 `journalctl -u wom -f`
-- init：标准输出/错误重定向至 `/var/log/wom.log`
-- 常见问题：
-  - 无法连接服务器：检查防火墙与 DNS，确认 `bemfa.com:8344` 可达
-  - 收到指令但未唤醒：
-    - 检查目标主机 BIOS/操作系统是否启用 WOL
-    - 局域网是否允许广播，端口 `9` 是否被阻断
-    - MAC 地址是否正确，交换机/AP 是否隔离广播
-  - 网络未就绪导致启动失败：systemd 单元使用 `network-online.target`，确保网络服务可用
+## 外部触发
 
-## 运行与开发
+### HTTP API
 
-- 手动运行（调试）：
-  - `cd <main.py所在目录>`
-  - `python3 main.py`
-- 修改配置无需改代码，直接编辑 `config.ini`
+```bash
+# GET 方式
+curl "http://<IP>:39090/api/external/trigger?token=YOUR_TOKEN&mac=AA:BB:CC:DD:EE:FF&action=wake"
 
-## 卸载
+# POST 方式
+curl -X POST "http://<IP>:39090/api/external/trigger?token=YOUR_TOKEN&device_id=1&action=shutdown"
+```
 
-- systemd：
-  - `sudo systemctl stop wom && sudo systemctl disable wom`
-  - 删除单元文件：`sudo rm /etc/systemd/system/wom.service && sudo systemctl daemon-reload`
-- init：
-  - 停止并删除脚本：`/etc/init.d/wom stop && sudo rm /etc/init.d/wom`
+### 巴法云
 
-## 安全建议
+在触发源管理中配置巴法云 UID 和 Topic，即可通过米家/小爱语音控制设备开关机。
 
-- 不要在公共仓库中提交真实 UID
-- 如需非 `root` 运行，请为运行用户配置访问日志/工作目录权限
+### MQTT
+
+配置 MQTT Broker 地址和 Topic，发送 `on`/`off` 消息触发设备操作。
+
+## 技术栈
+
+- **后端**：FastAPI + SQLAlchemy + APScheduler + paho-mqtt
+- **前端**：Vue 3 + Naive UI + Pinia + Vite
+- **数据库**：SQLite
+- **部署**：Docker (host 网络模式)
+
+## License
+
+MIT

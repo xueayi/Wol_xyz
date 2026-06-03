@@ -1,0 +1,9 @@
+data/*.db
+data/.fernet_key
+data/.env
+*.pyc
+__pycache__/
+node_modules/
+frontend/dist/
+*.log
+.venv/
