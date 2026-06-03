@@ -7,3 +7,4 @@ class DashboardStats(BaseModel):
     group_count: int
     schedule_count: int
     today_triggers: int
+    version: str

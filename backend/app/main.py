@@ -31,11 +31,13 @@ async def lifespan(app: FastAPI):
     from .services.scheduler import scheduler_service
     from .services.bemfa import start_bemfa_clients
     from .services.mqtt import start_mqtt_clients
+    from .services.telegram_bot import start_telegram_bots
 
     ping_task = asyncio.create_task(ping_loop())
     await scheduler_service.start()
     await start_bemfa_clients()
     await start_mqtt_clients()
+    await start_telegram_bots()
 
     yield
 
@@ -43,8 +45,10 @@ async def lifespan(app: FastAPI):
     scheduler_service.stop()
     from .services.bemfa import stop_all as stop_bemfa
     from .services.mqtt import stop_all as stop_mqtt
+    from .services.telegram_bot import stop_all as stop_telegram
     stop_bemfa()
     stop_mqtt()
+    stop_telegram()
 
 
 app = FastAPI(title="XiaoXue_WoL", version="1.0.0", lifespan=lifespan)

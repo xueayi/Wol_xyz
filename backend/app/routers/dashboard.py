@@ -10,6 +10,7 @@ from ..models.group import DeviceGroup
 from ..models.schedule import ScheduledTask
 from ..models.log import OperationLog
 from ..schemas.dashboard import DashboardStats
+from ..config import APP_VERSION
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"], dependencies=[Depends(get_current_user)])
 
@@ -30,4 +31,5 @@ async def stats(db: AsyncSession = Depends(get_db)):
         total_devices=total, online_devices=online,
         group_count=groups, schedule_count=schedules,
         today_triggers=today_triggers,
+        version=APP_VERSION,
     )

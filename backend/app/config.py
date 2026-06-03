@@ -5,6 +5,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
+_version_file = BASE_DIR / "VERSION"
+APP_VERSION = _version_file.read_text().strip() if _version_file.exists() else "dev"
+
 
 class Settings(BaseSettings):
     APP_NAME: str = "XiaoXue_WoL"

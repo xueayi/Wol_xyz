@@ -11,14 +11,32 @@ from ..config import settings
 logger = logging.getLogger(__name__)
 
 _ws_clients: set = set()
+_wake_event: asyncio.Event = None  # type: ignore
+
+
+def _get_event() -> asyncio.Event:
+    global _wake_event
+    if _wake_event is None:
+        _wake_event = asyncio.Event()
+    return _wake_event
 
 
 def register_ws(ws):
     _ws_clients.add(ws)
+    _get_event().set()
+    if len(_ws_clients) == 1:
+        logger.info("Ping monitor activated (client connected)")
 
 
 def unregister_ws(ws):
     _ws_clients.discard(ws)
+    if not _ws_clients:
+        _get_event().clear()
+        logger.info("Ping monitor paused (no active clients)")
+
+
+def has_active_clients() -> bool:
+    return len(_ws_clients) > 0
 
 
 async def _ping(ip: str) -> bool:
@@ -49,9 +67,15 @@ async def _broadcast_status(device_id: int, is_online: bool):
 
 
 async def ping_loop():
-    """Background task: periodically ping all devices."""
-    logger.info("Ping monitor started (interval=%ds)", settings.PING_INTERVAL)
+    """Background task: only ping devices when there are active WebSocket clients."""
+    event = _get_event()
+    logger.info("Ping monitor ready (interval=%ds, waiting for clients)", settings.PING_INTERVAL)
     while True:
+        await event.wait()
+
+        if not has_active_clients():
+            continue
+
         try:
             async with async_session() as db:
                 result = await db.execute(select(Device))
@@ -74,4 +98,7 @@ async def ping_loop():
         except Exception as e:
             logger.error("Ping loop error: %s", e)
 
-        await asyncio.sleep(settings.PING_INTERVAL)
+        try:
+            await asyncio.wait_for(event.wait(), timeout=settings.PING_INTERVAL)
+        except asyncio.TimeoutError:
+            pass

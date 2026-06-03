@@ -101,6 +101,34 @@ const triggerTab = ref('http')
             <p class="trigger-tip">Payload 仅需发送 <code>on</code>（开机）或 <code>off</code>（关机），不区分大小写</p>
           </div>
         </n-tab-pane>
+
+        <n-tab-pane name="telegram" tab="Telegram">
+          <div class="trigger-section">
+            <p class="trigger-desc">通过 Telegram Bot 交互式管理设备，支持查看状态、开关机、扫描局域网、查看日志等功能。</p>
+            <h4>配置步骤</h4>
+            <ol>
+              <li>在 Telegram 中搜索 <a href="https://t.me/BotFather" target="_blank" style="color:#007AFF">@BotFather</a>，发送 <code>/newbot</code> 创建 Bot</li>
+              <li>获取 Bot Token（格式如 <code>123456:ABC-DEF...</code>）</li>
+              <li>在「触发源管理」中添加 Telegram 类型的触发源，填入 Token</li>
+              <li>（可选）填写允许的 Chat ID 限制访问权限</li>
+              <li>在 Telegram 中搜索你的 Bot 并发送 <code>/start</code></li>
+            </ol>
+            <h4>可用命令</h4>
+            <div class="code-block">
+              <div class="code-label">基础命令</div>
+              <code>/start — 显示主菜单和功能按钮</code>
+            </div>
+            <div class="code-block">
+              <div class="code-label">设备管理</div>
+              <code>/devices — 查看所有设备状态，并可点击按钮开关机</code>
+            </div>
+            <div class="code-block">
+              <div class="code-label">其他功能</div>
+              <code>/groups — 查看设备分组<br/>/scan — 扫描局域网<br/>/logs — 查看最近 10 条操作日志</code>
+            </div>
+            <p class="trigger-tip">Chat ID 可通过向 <a href="https://t.me/userinfobot" target="_blank" style="color:#007AFF">@userinfobot</a> 发消息获取，多个用逗号分隔。留空则不限制访问。</p>
+          </div>
+        </n-tab-pane>
       </n-tabs>
     </div>
   </n-modal>

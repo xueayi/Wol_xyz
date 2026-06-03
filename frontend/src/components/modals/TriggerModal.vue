@@ -17,12 +17,14 @@ const typeOptions = [
   { label: 'HTTP API', value: 'http_api' },
   { label: '巴法云 (Bemfa)', value: 'bemfa' },
   { label: 'MQTT', value: 'mqtt' },
+  { label: 'Telegram Bot', value: 'telegram' },
 ]
 
 const typeLabel: Record<string, string> = {
   http_api: 'HTTP API',
   bemfa: '巴法云',
   mqtt: 'MQTT',
+  telegram: 'Telegram',
 }
 
 async function loadData() {
@@ -35,6 +37,7 @@ function getDefaults(type: string): any {
     case 'http_api': return { token: '' }
     case 'bemfa': return { uid: '', topic: '' }
     case 'mqtt': return { broker: '', port: 1883, username: '', password: '', topic: 'xiaoxue_wol/#' }
+    case 'telegram': return { bot_token: '', allowed_chat_ids: '' }
     default: return {}
   }
 }
@@ -149,6 +152,16 @@ function generateToken() {
           <n-form-item label="Topic"><n-input v-model:value="form.config.topic" placeholder="xiaoxue_wol/#" /></n-form-item>
           <div class="config-hint">
             向 Topic 发送 <code>on</code> 开机 / <code>off</code> 关机
+          </div>
+        </template>
+
+        <template v-if="form.type === 'telegram'">
+          <n-form-item label="Bot Token"><n-input v-model:value="form.config.bot_token" placeholder="从 @BotFather 获取" style="font-family:monospace" /></n-form-item>
+          <n-form-item label="允许的 Chat ID">
+            <n-input v-model:value="form.config.allowed_chat_ids" placeholder="多个用逗号分隔，留空则不限制" />
+          </n-form-item>
+          <div class="config-hint">
+            在 Telegram 中搜索 <a href="https://t.me/BotFather" target="_blank" style="color:#007AFF">@BotFather</a> 创建 Bot 获取 Token。Chat ID 可通过 <a href="https://t.me/userinfobot" target="_blank" style="color:#007AFF">@userinfobot</a> 获取。Bot 支持命令：/devices 查看设备、点击按钮开关机、/scan 扫描局域网、/logs 查看日志。
           </div>
         </template>
       </n-form>

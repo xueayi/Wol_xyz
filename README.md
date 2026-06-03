@@ -14,6 +14,7 @@
   - 巴法云（Bemfa）TCP 协议 — 支持米家/小爱/Home Assistant
   - HTTP API Token — 通用 REST 接口
   - MQTT — IoT 标准协议
+  - Telegram Bot — 交互式设备管理（查看状态/开关机/扫描/日志）
 - **通知渠道**：邮件（SMTP）和通用 Webhook（内置飞书/企业微信模板），支持多实例
 - **操作日志**：记录所有操作的成功/失败详情
 
@@ -103,6 +104,22 @@ curl -X POST "http://<IP>:39090/api/external/trigger?token=YOUR_TOKEN&device_id=
 ### MQTT
 
 配置 MQTT Broker 地址和 Topic，发送 `on`/`off` 消息触发设备操作。
+
+### Telegram Bot
+
+1. 通过 [@BotFather](https://t.me/BotFather) 创建 Bot 并获取 Token
+2. 在触发源管理中添加 Telegram 类型并填入 Token
+3. 在 Telegram 中与 Bot 对话即可管理设备
+
+支持的命令：
+
+| 命令 | 功能 |
+|------|------|
+| `/start` | 显示主菜单和功能按钮 |
+| `/devices` | 查看所有设备状态，点击按钮开关机 |
+| `/groups` | 查看设备分组 |
+| `/scan` | 扫描局域网 |
+| `/logs` | 查看最近操作日志 |
 
 ## 技术栈
 

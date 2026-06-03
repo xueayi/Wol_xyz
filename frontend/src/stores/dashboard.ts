@@ -5,7 +5,7 @@ import { getGroupsWithDevices } from '../api/groups'
 import { getChannels } from '../api/channels'
 
 export const useDashboardStore = defineStore('dashboard', () => {
-  const stats = ref({ total_devices: 0, online_devices: 0, group_count: 0, schedule_count: 0, today_triggers: 0 })
+  const stats = ref({ total_devices: 0, online_devices: 0, group_count: 0, schedule_count: 0, today_triggers: 0, version: '' })
   const groups = ref<any[]>([])
   const recentLogs = ref<any[]>([])
   const channels = ref<any[]>([])
