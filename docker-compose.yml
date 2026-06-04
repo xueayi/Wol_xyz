@@ -1,6 +1,6 @@
 services:
   wol-xyz:
-    image: xueayi/wol-xyz:latest
+    image: xueayis/wol-xyz:latest
     build: .
     container_name: wol-xyz
     network_mode: host

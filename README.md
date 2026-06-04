@@ -28,17 +28,6 @@
 ### Docker 部署（推荐）
 
 ```bash
-docker run -d \
-  --name wol-xyz \
-  --network host \
-  --restart unless-stopped \
-  -v ./data:/app/data \
-  xueayi/wol-xyz:latest
-```
-
-或使用 docker-compose：
-
-```bash
 git clone https://github.com/xueayi/Wol_XYZ.git
 cd Wol_XYZ
 docker compose up -d
