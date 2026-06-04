@@ -2,6 +2,10 @@
 
 一个轻量级的局域网设备远程管理工具，提供 Web 管理面板，支持 Wake-on-LAN 远程开机、SSH 远程关机、设备状态监控、定时任务和多渠道通知。
 
+## 项目展示
+
+![Wol_xyz Dashboard](docs/images/screenshot.png)
+
 ## 功能特性
 
 - **多设备管理**：通过卡片式界面管理所有局域网设备
