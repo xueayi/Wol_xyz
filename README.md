@@ -31,9 +31,24 @@
 
 ### Docker 部署（推荐）
 
+创建 `docker-compose.yml` 文件：
+
+```yaml
+services:
+  wol-xyz:
+    image: xueayis/wol-xyz:latest
+    container_name: wol-xyz
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    environment:
+      - WEB_PORT=39090
+```
+
+启动服务：
+
 ```bash
-git clone https://github.com/xueayi/Wol_XYZ.git
-cd Wol_XYZ
 docker compose up -d
 ```
 
