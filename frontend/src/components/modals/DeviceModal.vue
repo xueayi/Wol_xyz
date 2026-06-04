@@ -13,6 +13,21 @@ const groups = ref<any[]>([])
 const saving = ref(false)
 const isEdit = ref(false)
 
+const deviceTypeOptions = [
+  { label: 'Windows', value: 'windows' },
+  { label: 'macOS', value: 'macos' },
+  { label: 'Linux', value: 'linux' },
+  { label: 'iPhone', value: 'iphone' },
+  { label: 'iPad', value: 'ipad' },
+  { label: 'Android', value: 'android' },
+  { label: '智能手表', value: 'watch' },
+  { label: 'NAS', value: 'nas' },
+  { label: '路由器', value: 'router' },
+  { label: 'IoT 设备', value: 'iot' },
+  { label: '其他电脑', value: 'computer' },
+  { label: '其他设备', value: 'other' },
+]
+
 watch(() => props.show, async (v) => {
   if (!v) return
   const { data } = await getGroups()
@@ -22,7 +37,7 @@ watch(() => props.show, async (v) => {
     form.value = { ...props.device }
   } else {
     isEdit.value = false
-    form.value = { name: '', ip: '', mac: '', adapter_name: '', group_id: null, shutdown_enabled: false, shutdown_user: '', shutdown_password: '' }
+    form.value = { name: '', ip: '', mac: '', adapter_name: '', device_type: 'computer', group_id: null, shutdown_enabled: false, shutdown_user: '', shutdown_password: '' }
   }
 })
 
@@ -67,6 +82,9 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
       <n-form-item label="名称"><n-input v-model:value="form.name" /></n-form-item>
       <n-form-item label="IP 地址"><n-input v-model:value="form.ip" placeholder="192.168.1.100" /></n-form-item>
       <n-form-item label="MAC 地址"><n-input v-model:value="form.mac" placeholder="AA:BB:CC:DD:EE:FF" /></n-form-item>
+      <n-form-item label="设备类型">
+        <n-select v-model:value="form.device_type" :options="deviceTypeOptions" />
+      </n-form-item>
       <n-form-item label="网卡名称"><n-input v-model:value="form.adapter_name" placeholder="可选" /></n-form-item>
       <n-form-item label="分组">
         <n-select v-model:value="form.group_id" :options="groupOptions()" clearable placeholder="选择分组" />

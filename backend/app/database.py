@@ -20,3 +20,18 @@ async def init_db():
     async with engine.begin() as conn:
         from . import models  # noqa: F401
         await conn.run_sync(Base.metadata.create_all)
+        await _migrate_add_columns(conn)
+
+
+async def _migrate_add_columns(conn):
+    """Add new columns to existing tables if they don't exist (simple migration)."""
+    import sqlalchemy as sa
+
+    migrations = [
+        ("devices", "device_type", "VARCHAR(16) DEFAULT 'computer'"),
+    ]
+    for table, column, col_def in migrations:
+        try:
+            await conn.execute(sa.text(f"ALTER TABLE {table} ADD COLUMN {column} {col_def}"))
+        except Exception:
+            pass

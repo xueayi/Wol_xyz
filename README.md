@@ -1,21 +1,26 @@
-# XiaoXue WoL - 局域网设备管理
+# Wol_xyz - 局域网设备管理
 
 一个轻量级的局域网设备远程管理工具，提供 Web 管理面板，支持 Wake-on-LAN 远程开机、SSH 远程关机、设备状态监控、定时任务和多渠道通知。
 
 ## 功能特性
 
 - **多设备管理**：通过卡片式界面管理所有局域网设备
+- **设备类型识别**：OUI 指纹自动推测 + 路由器 DNS 反向解析获取设备名，支持手动选择（Windows/macOS/Linux/iPad/iPhone/Android/NAS/路由器等）
 - **设备分组**：按办公设备、家庭设备等自定义分类
-- **实时状态监控**：ICMP Ping 定期检测设备在线状态，WebSocket 实时推送
+- **批量管理**：全选/批量删除/批量移动分组
+- **实时状态监控**：ICMP Ping 定期检测设备在线状态，WebSocket 实时推送，双次确认防误判
+- **局域网扫描**：UDP 广播 + ARP 表发现设备，自动获取设备名称和类型，过滤已添加设备
 - **远程开机**：WOL 魔术包唤醒（需目标设备开启 WOL）
 - **远程关机**：SSH 连接执行关机命令（支持密码认证）
-- **定时任务**：Cron 表达式驱动的自动开关机
+- **定时任务**：可视化频率配置（每天/每周/每月），替代原始 cron 表达式
 - **外部触发源**：
   - 巴法云（Bemfa）TCP 协议 — 支持米家/小爱/Home Assistant
-  - HTTP API Token — 通用 REST 接口
+  - API Token — 通用 REST 接口
   - MQTT — IoT 标准协议
   - Telegram Bot — 交互式设备管理（查看状态/开关机/扫描/日志）
-- **通知渠道**：邮件（SMTP）和通用 Webhook（内置飞书/企业微信模板），支持多实例
+- **通知渠道**：邮件（SMTP）、Webhook（内置飞书/企业微信模板）、Telegram，支持多实例
+- **通知类型**：可按渠道独立配置「触发通知」和「任务成功通知」（设备状态确认）
+- **用户管理**：Web 面板内修改账号密码、重新生成 JWT 密钥
 - **操作日志**：记录所有操作的成功/失败详情
 
 ## 快速开始
@@ -23,12 +28,23 @@
 ### Docker 部署（推荐）
 
 ```bash
-git clone https://github.com/xueayi/XiaoXue_WoL.git
-cd XiaoXue_WoL
+docker run -d \
+  --name wol-xyz \
+  --network host \
+  --restart unless-stopped \
+  -v ./data:/app/data \
+  xueayi/wol-xyz:latest
+```
+
+或使用 docker-compose：
+
+```bash
+git clone https://github.com/xueayi/Wol_XYZ.git
+cd Wol_XYZ
 docker compose up -d
 ```
 
-访问 `http://<宿主机IP>:39090`，默认账号 `admin` / `admin`。
+访问 `http://<宿主机IP>:39090`，默认账号 `admin` / `admin`（首次登录后请在「用户管理」中修改密码）。
 
 > **重要**：使用 `network_mode: host` 确保 WOL 广播和局域网扫描正常工作。
 
@@ -36,25 +52,38 @@ docker compose up -d
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `WOM_WEB_PORT` | `39090` | Web 面板端口 |
-| `WOM_ADMIN_USERNAME` | `admin` | 管理员用户名 |
-| `WOM_ADMIN_PASSWORD` | `admin` | 管理员初始密码 |
-| `WOM_SECRET_KEY` | 随机值 | JWT 签名密钥（生产环境请修改） |
-| `WOM_PING_INTERVAL` | `60` | Ping 检测间隔（秒） |
+| `WEB_PORT` | `39090` | Web 面板端口 |
+| `PING_INTERVAL` | `60` | Ping 检测间隔（秒） |
 
-### 本地开发
+> 默认管理员账号 `admin` / `admin`，JWT 密钥自动生成。均可在 Web 面板「用户管理」中修改。
+
+### 本地开发（虚拟环境）
 
 ```bash
-# 后端
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 39090
+# 1. 克隆仓库
+git clone https://github.com/xueayi/Wol_XYZ.git
+cd Wol_XYZ
 
-# 前端
+# 2. 创建并激活 Python 虚拟环境
+python3 -m venv .venv
+source .venv/bin/activate        # Linux / macOS
+# .venv\Scripts\activate         # Windows
+
+# 3. 安装后端依赖
+pip install -r backend/requirements.txt
+
+# 4. 启动后端（开发模式，自动重载）
+uvicorn backend.app.main:app --reload --port 39090
+
+# 5. （新终端）安装并启动前端
 cd frontend
 npm install
 npm run dev
 ```
+
+前端开发服务器默认在 `http://localhost:5173`，API 请求会代理到后端 `:39090`。
+
+> **提示**：后端需要 `iputils-ping`、`openssh-client`、`sshpass` 等系统工具才能正常执行 Ping 和 SSH 操作。macOS 通常已内置，Linux 可通过 `apt install iputils-ping openssh-client sshpass` 安装。
 
 ## 目标设备配置
 
@@ -87,7 +116,7 @@ npm run dev
 
 ## 外部触发
 
-### HTTP API
+### API
 
 ```bash
 # GET 方式
@@ -109,7 +138,8 @@ curl -X POST "http://<IP>:39090/api/external/trigger?token=YOUR_TOKEN&device_id=
 
 1. 通过 [@BotFather](https://t.me/BotFather) 创建 Bot 并获取 Token
 2. 在触发源管理中添加 Telegram 类型并填入 Token
-3. 在 Telegram 中与 Bot 对话即可管理设备
+3. 可开启「同步通知渠道」让 Bot 同时作为通知推送渠道
+4. 在 Telegram 中与 Bot 对话即可管理设备
 
 支持的命令：
 
@@ -121,12 +151,22 @@ curl -X POST "http://<IP>:39090/api/external/trigger?token=YOUR_TOKEN&device_id=
 | `/scan` | 扫描局域网 |
 | `/logs` | 查看最近操作日志 |
 
+## API 文档
+
+启动服务后可访问自动生成的交互式 API 文档：
+
+| 地址 | 说明 |
+|------|------|
+| `http://<IP>:39090/docs` | Swagger UI（可直接测试接口） |
+| `http://<IP>:39090/redoc` | ReDoc（阅读友好） |
+| `http://<IP>:39090/openapi.json` | OpenAPI JSON Schema |
+
 ## 技术栈
 
 - **后端**：FastAPI + SQLAlchemy + APScheduler + paho-mqtt
 - **前端**：Vue 3 + Naive UI + Pinia + Vite
 - **数据库**：SQLite
-- **部署**：Docker (host 网络模式)
+- **部署**：Docker (host 网络模式) + GitHub Actions CI/CD
 
 ## License
 

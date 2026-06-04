@@ -2,8 +2,8 @@
 import { ref } from 'vue'
 import DeviceCard from './DeviceCard.vue'
 
-defineProps<{ group: any }>()
-const emit = defineEmits(['refresh', 'editDevice'])
+defineProps<{ group: any; batchMode?: boolean; selectedDevices?: number[] }>()
+const emit = defineEmits(['refresh', 'editDevice', 'toggleSelect'])
 const collapsed = ref(false)
 </script>
 
@@ -27,8 +27,11 @@ const collapsed = ref(false)
           v-for="device in group.devices"
           :key="device.id"
           :device="device"
+          :batch-mode="batchMode"
+          :selected="selectedDevices?.includes(device.id)"
           @refresh="emit('refresh')"
           @edit="(d) => emit('editDevice', d)"
+          @toggle-select="(id) => emit('toggleSelect', id)"
         />
       </div>
     </Transition>

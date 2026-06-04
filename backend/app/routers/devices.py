@@ -7,7 +7,7 @@ from ..database import get_db
 from ..auth import get_current_user
 from ..models.device import Device
 from ..models.user import User
-from ..schemas.device import DeviceCreate, DeviceUpdate, DeviceOut
+from ..schemas.device import DeviceCreate, DeviceUpdate, DeviceOut, BatchDeleteRequest, BatchMoveRequest
 from ..crypto import encrypt
 from typing import Optional
 
@@ -28,7 +28,8 @@ async def list_devices(group_id: Optional[int] = None, db: AsyncSession = Depend
 async def create_device(body: DeviceCreate, db: AsyncSession = Depends(get_db)):
     device = Device(
         name=body.name, ip=body.ip, mac=body.mac.upper(),
-        adapter_name=body.adapter_name, group_id=body.group_id,
+        adapter_name=body.adapter_name, device_type=body.device_type,
+        group_id=body.group_id,
         shutdown_enabled=body.shutdown_enabled, shutdown_user=body.shutdown_user,
         shutdown_password_enc=encrypt(body.shutdown_password),
     )
@@ -94,3 +95,27 @@ async def shutdown_device(device_id: int, db: AsyncSession = Depends(get_db)):
     from ..services.log_writer import write_log
     await write_log(db, device.id, "shutdown", "success" if success else "failure", detail, "manual")
     return {"success": success, "detail": detail}
+
+
+@router.post("/batch-delete", status_code=200)
+async def batch_delete_devices(body: BatchDeleteRequest, db: AsyncSession = Depends(get_db)):
+    if not body.ids:
+        raise HTTPException(status_code=400, detail="请选择至少一个设备")
+    result = await db.execute(select(Device).where(Device.id.in_(body.ids)))
+    devices = result.scalars().all()
+    for device in devices:
+        await db.delete(device)
+    await db.commit()
+    return {"deleted": len(devices)}
+
+
+@router.post("/batch-move", status_code=200)
+async def batch_move_devices(body: BatchMoveRequest, db: AsyncSession = Depends(get_db)):
+    if not body.ids:
+        raise HTTPException(status_code=400, detail="请选择至少一个设备")
+    result = await db.execute(select(Device).where(Device.id.in_(body.ids)))
+    devices = result.scalars().all()
+    for device in devices:
+        device.group_id = body.group_id
+    await db.commit()
+    return {"moved": len(devices)}

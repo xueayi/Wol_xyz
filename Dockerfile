@@ -9,19 +9,20 @@ FROM python:3.11-slim
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends iputils-ping openssh-client sshpass net-tools && \
+    apt-get install -y --no-install-recommends iputils-ping openssh-client sshpass net-tools dnsutils && \
     rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ ./backend/
+COPY VERSION ./
 COPY --from=frontend-build /build/dist ./frontend/dist/
 
 RUN mkdir -p /app/data
 
-ENV WOM_DATABASE_URL="sqlite+aiosqlite:///./data/xiaoxue_wol.db"
-ENV WOM_WEB_PORT=39090
+ENV DATABASE_URL="sqlite+aiosqlite:///./data/wol_xyz.db"
+ENV WEB_PORT=39090
 
 EXPOSE 39090
 

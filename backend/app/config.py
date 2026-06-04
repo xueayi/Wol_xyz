@@ -10,10 +10,10 @@ APP_VERSION = _version_file.read_text().strip() if _version_file.exists() else "
 
 
 class Settings(BaseSettings):
-    APP_NAME: str = "XiaoXue_WoL"
+    APP_NAME: str = "Wol_xyz"
     WEB_PORT: int = 39090
-    DATABASE_URL: str = f"sqlite+aiosqlite:///{DATA_DIR / 'xiaoxue_wol.db'}"
-    SECRET_KEY: str = "wolmijia-change-me-in-production"
+    DATABASE_URL: str = f"sqlite+aiosqlite:///{DATA_DIR / 'wol_xyz.db'}"
+    SECRET_KEY: str = "wol-xyz-change-me-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24h
     ADMIN_USERNAME: str = "admin"
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     PING_INTERVAL: int = 60
     FERNET_KEY: str = ""
 
-    model_config = {"env_prefix": "WOM_", "env_file": str(DATA_DIR / ".env"), "extra": "ignore"}
+    model_config = {"env_prefix": "", "env_file": str(DATA_DIR / ".env"), "extra": "ignore"}
 
 
 settings = Settings()

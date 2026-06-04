@@ -85,6 +85,9 @@ async def _execute_task(task_id: int, device_id: int, action: str):
 
         from .log_writer import write_log
         await write_log(db, device_id, action, "success" if ok else "failure", detail, "scheduled")
+        if ok:
+            from .ping_monitor import register_pending_check
+            register_pending_check(device_id, action, device.name)
 
         task_obj = (await db.execute(select(ScheduledTask).where(ScheduledTask.id == task_id))).scalar_one_or_none()
         if task_obj:

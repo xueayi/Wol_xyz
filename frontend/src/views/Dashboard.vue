@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { useDashboardStore } from '../stores/dashboard'
 import { useAuthStore } from '../stores/auth'
+import { useMessage } from 'naive-ui'
 import StatsBar from '../components/StatsBar.vue'
 import DeviceGroup from '../components/DeviceGroup.vue'
 import QuickActions from '../components/QuickActions.vue'
@@ -16,13 +17,23 @@ import InfoModal from '../components/modals/InfoModal.vue'
 import GuideModal from '../components/modals/GuideModal.vue'
 import TriggerModal from '../components/modals/TriggerModal.vue'
 import GroupModal from '../components/modals/GroupModal.vue'
+import UserModal from '../components/modals/UserModal.vue'
+import { batchDeleteDevices, batchMoveDevices } from '../api/devices'
+import { getGroups } from '../api/groups'
 
 const store = useDashboardStore()
 const auth = useAuthStore()
+const msg = useMessage()
 
 const searchQuery = ref('')
 const filterGroup = ref<number | null>(null)
 const viewMode = ref<'card' | 'list'>('card')
+
+const batchMode = ref(false)
+const selectedDevices = ref<number[]>([])
+const batchGroups = ref<any[]>([])
+const showBatchMoveSelect = ref(false)
+const batchMoveTarget = ref<number | null>(null)
 
 const showDeviceModal = ref(false)
 const editingDevice = ref<any>(null)
@@ -34,6 +45,7 @@ const showGroupModal = ref(false)
 const showInfoModal = ref(false)
 const showGuideModal = ref(false)
 const showTriggerModal = ref(false)
+const showUserModal = ref(false)
 const infoTitle = ref('')
 const infoContent = ref('')
 
@@ -81,45 +93,12 @@ function handleAction(key: string) {
     case 'addDevice': editingDevice.value = null; showDeviceModal.value = true; break
     case 'schedules': showScheduleModal.value = true; break
     case 'triggers': showTriggerModal.value = true; break
-    case 'wolConfig':
-      infoTitle.value = 'WoL 配置指引'
-      infoContent.value = `
-        <h3>远程开机 (Wake-on-LAN)</h3>
-        <h4>Windows</h4>
-        <ol>
-          <li><b>BIOS</b>：电源管理 → 启用 Wake on LAN / PCI-E 唤醒</li>
-          <li><b>设备管理器</b>：网卡 → 属性 → 电源管理 → 勾选「允许此设备唤醒计算机」</li>
-          <li><b>网卡高级属性</b>：启用「魔术封包唤醒」(Wake on Magic Packet)</li>
-          <li><b>关闭快速启动</b>：控制面板 → 电源选项 → 关闭快速启动</li>
-        </ol>
-        <h4>Linux</h4>
-        <ol>
-          <li><b>BIOS</b>：同上，启用 Wake on LAN</li>
-          <li><b>安装 ethtool</b>：<code>sudo apt install ethtool</code></li>
-          <li><b>启用 WoL</b>：<code>sudo ethtool -s eth0 wol g</code>（eth0 替换为实际网卡名）</li>
-          <li><b>持久化</b>：编辑 <code>/etc/network/interfaces</code> 或创建 systemd 服务使其开机生效</li>
-        </ol>
-        <h4>macOS</h4>
-        <ol>
-          <li>系统设置 → 节能 → 勾选「唤醒以供网络访问」</li>
-          <li>仅支持有线以太网连接，Wi-Fi 下 WoL 不可用</li>
-        </ol>
-        <h3>远程关机 (SSH)</h3>
-        <ol>
-          <li><b>Windows</b>：设置 → 应用 → 可选功能 → 添加 OpenSSH Server</li>
-          <li><b>Linux / macOS</b>：通常自带 SSH，确保 sshd 已启用</li>
-          <li>确保 SSH 端口 22 未被防火墙阻止</li>
-          <li>在设备设置中启用远程关机并填写 SSH 凭据</li>
-        </ol>`
-      showInfoModal.value = true
-      break
-    case 'guide':
-      showGuideModal.value = true
-      break
+    case 'userMgmt': showUserModal.value = true; break
+    case 'guide': showGuideModal.value = true; break
     case 'about':
       infoTitle.value = '项目说明'
       infoContent.value = `
-        <h3>XiaoXue WoL — 局域网设备管理</h3>
+        <h3>Wol_xyz — 局域网设备管理</h3>
         <p>一个轻量级的局域网设备远程管理工具，支持 Wake-on-LAN 远程开机、SSH 远程关机、设备状态监控、定时任务和多渠道通知。</p>
         <h3>核心功能</h3>
         <ul>
@@ -127,11 +106,11 @@ function handleAction(key: string) {
           <li>实时在线状态监控（ICMP Ping）</li>
           <li>WOL 远程开机 / SSH 远程关机</li>
           <li>定时任务（Cron 表达式）</li>
-          <li>外部触发源（巴法云 / HTTP API / MQTT）</li>
-          <li>通知渠道（邮件 / Webhook）</li>
+          <li>外部触发源（巴法云 / API / MQTT / Telegram）</li>
+          <li>通知渠道（邮件 / Webhook / Telegram）</li>
           <li>操作日志记录</li>
         </ul>
-        <p style="margin-top:12px"><a href="https://github.com/xueayi/XiaoXue_WoL" target="_blank" style="color:#007AFF;text-decoration:none;font-weight:500">GitHub 仓库 →</a></p>`
+        <p style="margin-top:12px"><a href="https://github.com/xueayi/Wol_XYZ" target="_blank" style="color:#007AFF;text-decoration:none;font-weight:500">GitHub 仓库 →</a></p>`
       showInfoModal.value = true
       break
   }
@@ -144,6 +123,71 @@ function handleEditDevice(device: any) {
 
 async function refresh() {
   await store.fetchAll()
+}
+
+function toggleBatchMode() {
+  batchMode.value = !batchMode.value
+  if (!batchMode.value) {
+    selectedDevices.value = []
+    showBatchMoveSelect.value = false
+  }
+}
+
+const allDeviceIds = computed(() => {
+  const ids: number[] = []
+  for (const g of filteredGroups.value) {
+    if (g.devices) {
+      for (const d of g.devices) ids.push(d.id)
+    }
+  }
+  return ids
+})
+
+const isAllSelected = computed(() =>
+  allDeviceIds.value.length > 0 && allDeviceIds.value.every((id) => selectedDevices.value.includes(id))
+)
+
+function selectAllDevices() {
+  if (isAllSelected.value) {
+    selectedDevices.value = []
+  } else {
+    selectedDevices.value = [...allDeviceIds.value]
+  }
+}
+
+function toggleDeviceSelect(id: number) {
+  const idx = selectedDevices.value.indexOf(id)
+  if (idx === -1) selectedDevices.value.push(id)
+  else selectedDevices.value.splice(idx, 1)
+}
+
+async function handleBatchDelete() {
+  if (selectedDevices.value.length === 0) return
+  try {
+    await batchDeleteDevices(selectedDevices.value)
+    msg.success(`已删除 ${selectedDevices.value.length} 台设备`)
+    selectedDevices.value = []
+    batchMode.value = false
+    await refresh()
+  } catch { msg.error('批量删除失败') }
+}
+
+async function openBatchMove() {
+  const { data } = await getGroups()
+  batchGroups.value = data
+  showBatchMoveSelect.value = true
+}
+
+async function handleBatchMove() {
+  if (selectedDevices.value.length === 0) return
+  try {
+    await batchMoveDevices(selectedDevices.value, batchMoveTarget.value)
+    msg.success(`已移动 ${selectedDevices.value.length} 台设备`)
+    selectedDevices.value = []
+    batchMode.value = false
+    showBatchMoveSelect.value = false
+    await refresh()
+  } catch { msg.error('批量移动失败') }
 }
 
 onMounted(async () => {
@@ -168,7 +212,7 @@ onUnmounted(() => { ws?.close() })
           </svg>
         </div>
         <div>
-          <h1 class="app-title">XiaoXue WoL</h1>
+          <h1 class="app-title">Wol_xyz</h1>
           <p class="app-subtitle">局域网设备管理 <span v-if="store.stats.version" class="version-tag">v{{ store.stats.version }}</span></p>
         </div>
       </div>
@@ -193,6 +237,10 @@ onUnmounted(() => { ws?.close() })
             <button class="text-btn" @click="showGroupModal = true">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
               分组管理
+            </button>
+            <button class="text-btn" :class="{ 'text-btn-active': batchMode }" @click="toggleBatchMode">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              {{ batchMode ? '退出批量' : '批量管理' }}
             </button>
           </div>
           <div class="toolbar-right">
@@ -220,8 +268,11 @@ onUnmounted(() => { ws?.close() })
             v-for="group in filteredGroups"
             :key="group.id"
             :group="group"
+            :batch-mode="batchMode"
+            :selected-devices="selectedDevices"
             @refresh="refresh"
             @edit-device="handleEditDevice"
+            @toggle-select="toggleDeviceSelect"
           />
           <div v-if="filteredGroups.length === 0" class="empty-state">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#c7c7cc" stroke-width="1.5" stroke-linecap="round">
@@ -251,12 +302,39 @@ onUnmounted(() => { ws?.close() })
     <InfoModal v-model:show="showInfoModal" :title="infoTitle" :content="infoContent" />
     <GuideModal v-model:show="showGuideModal" />
     <TriggerModal v-model:show="showTriggerModal" @saved="refresh" />
+    <UserModal v-model:show="showUserModal" />
+
+    <Transition name="slide-up">
+      <div v-if="batchMode" class="batch-bar">
+        <span class="batch-count">已选 {{ selectedDevices.length }} / {{ allDeviceIds.length }}</span>
+        <div class="batch-actions">
+          <button class="batch-btn" @click="selectAllDevices">{{ isAllSelected ? '取消全选' : '全选' }}</button>
+          <n-popconfirm @positive-click="handleBatchDelete" :disabled="selectedDevices.length === 0">
+            <template #trigger>
+              <button class="batch-btn batch-btn-danger" :disabled="selectedDevices.length === 0">批量删除</button>
+            </template>
+            确定删除选中的 {{ selectedDevices.length }} 台设备？
+          </n-popconfirm>
+          <button class="batch-btn batch-btn-primary" :disabled="selectedDevices.length === 0" @click="openBatchMove">移动到分组</button>
+          <button class="batch-btn" @click="toggleBatchMode">退出</button>
+        </div>
+      </div>
+    </Transition>
+
+    <n-modal v-model:show="showBatchMoveSelect" preset="card" title="移动到分组" style="width:380px" :bordered="false">
+      <n-select v-model:value="batchMoveTarget" placeholder="选择目标分组（留空为取消分组）"
+        :options="[{ label: '取消分组', value: null }, ...batchGroups.map((g: any) => ({ label: g.name, value: g.id }))]"
+        clearable />
+      <template #action>
+        <n-button type="primary" @click="handleBatchMove">确定移动</n-button>
+      </template>
+    </n-modal>
 
     <footer class="app-footer">
-      <span>XiaoXue WoL</span>
+      <span>Wol_xyz</span>
       <span v-if="store.stats.version" class="footer-version">v{{ store.stats.version }}</span>
       <span class="footer-sep">·</span>
-      <a href="https://github.com/xueayi/XiaoXue_WoL" target="_blank" class="footer-link">
+      <a href="https://github.com/xueayi/Wol_XYZ" target="_blank" class="footer-link">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
         GitHub
       </a>
@@ -376,6 +454,10 @@ onUnmounted(() => { ws?.close() })
   transition: background 0.2s;
 }
 .text-btn:hover { background: rgba(0,122,255,0.06); }
+.text-btn-active {
+  color: #FF3B30;
+}
+.text-btn-active:hover { background: rgba(255,59,48,0.06); }
 .toolbar-right {
   display: flex;
   align-items: center;
@@ -517,5 +599,71 @@ onUnmounted(() => { ws?.close() })
 @media (max-width: 1024px) {
   .main-content { grid-template-columns: 1fr; }
   .sidebar { order: -1; }
+}
+
+/* Batch action bar */
+.batch-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.06);
+  z-index: 100;
+}
+.batch-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1c1c1e;
+  white-space: nowrap;
+}
+.batch-actions {
+  display: flex;
+  gap: 8px;
+}
+.batch-btn {
+  border: none;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  background: rgba(0,0,0,0.05);
+  color: #636366;
+}
+.batch-btn:hover { background: rgba(0,0,0,0.08); }
+.batch-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.batch-btn:disabled:hover { background: rgba(0,0,0,0.05); }
+.batch-btn-primary {
+  background: rgba(0,122,255,0.1);
+  color: #007AFF;
+}
+.batch-btn-primary:hover { background: rgba(0,122,255,0.18); }
+.batch-btn-danger {
+  background: rgba(255,59,48,0.1);
+  color: #FF3B30;
+}
+.batch-btn-danger:hover { background: rgba(255,59,48,0.18); }
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.slide-up-enter-from,
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(20px);
 }
 </style>

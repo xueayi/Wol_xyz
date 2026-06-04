@@ -14,7 +14,7 @@ watch(() => props.show, (val) => {
 const channels = ref<any[]>([])
 const showForm = ref(false)
 const editItem = ref<any>(null)
-const form = ref({ type: 'webhook', name: '', config: {} as any, enabled: true })
+const form = ref({ type: 'webhook', name: '', config: {} as any, enabled: true, notify_on_trigger: true, notify_on_success: false })
 const saving = ref(false)
 const testing = ref<number | null>(null)
 
@@ -35,11 +35,13 @@ async function loadData() {
 function openAdd(type: string) {
   editItem.value = null
   if (type === 'email') {
-    form.value = { type, name: '', config: { host: '', port: 587, tls: true, username: '', password: '', from_addr: '', to_addr: '' }, enabled: true }
+    form.value = { type, name: '', config: { host: '', port: 587, tls: true, username: '', password: '', from_addr: '', to_addr: '' }, enabled: true, notify_on_trigger: true, notify_on_success: false }
+  } else if (type === 'telegram') {
+    form.value = { type, name: '', config: { bot_token: '', chat_ids: '' }, enabled: true, notify_on_trigger: true, notify_on_success: false }
   } else {
     selectedPreset.value = 'custom'
     const p = webhookPresets.custom
-    form.value = { type, name: '', config: { url: '', method: 'POST', headers: JSON.stringify(p.headers, null, 2), body_template: p.body }, enabled: true }
+    form.value = { type, name: '', config: { url: '', method: 'POST', headers: JSON.stringify(p.headers, null, 2), body_template: p.body }, enabled: true, notify_on_trigger: true, notify_on_success: false }
   }
   showForm.value = true
 }
@@ -51,9 +53,9 @@ function openEdit(item: any) {
     if (typeof cfg.headers === 'object') cfg.headers = JSON.stringify(cfg.headers, null, 2)
     if (typeof cfg.body_template === 'object') cfg.body_template = JSON.stringify(cfg.body_template, null, 2)
     selectedPreset.value = cfg._preset || 'custom'
-    form.value = { type: item.type, name: item.name, config: cfg, enabled: item.enabled }
+    form.value = { type: item.type, name: item.name, config: cfg, enabled: item.enabled, notify_on_trigger: item.notify_on_trigger ?? true, notify_on_success: item.notify_on_success ?? false }
   } else {
-    form.value = { type: item.type, name: item.name, config: { ...item.config }, enabled: item.enabled }
+    form.value = { type: item.type, name: item.name, config: { ...item.config }, enabled: item.enabled, notify_on_trigger: item.notify_on_trigger ?? true, notify_on_success: item.notify_on_success ?? false }
   }
   showForm.value = true
 }
@@ -110,13 +112,14 @@ async function handleDelete(id: number) {
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <n-button size="small" tertiary @click="openAdd('email')">+ 邮件</n-button>
         <n-button size="small" tertiary @click="openAdd('webhook')">+ Webhook</n-button>
+        <n-button size="small" tertiary @click="openAdd('telegram')">+ Telegram</n-button>
       </div>
       <n-table :bordered="false" :single-line="false" size="small">
         <thead><tr><th>名称</th><th>类型</th><th>状态</th><th>操作</th></tr></thead>
         <tbody>
           <tr v-for="ch in channels" :key="ch.id">
             <td>{{ ch.name }}</td>
-            <td>{{ ch.type === 'email' ? '邮件' : 'Webhook' }}</td>
+            <td>{{ { email: '邮件', webhook: 'Webhook', telegram: 'Telegram' }[ch.type] || ch.type }}</td>
             <td><n-tag :type="ch.enabled ? 'success' : 'default'" size="tiny">{{ ch.enabled ? '启用' : '禁用' }}</n-tag></td>
             <td style="display:flex;gap:4px">
               <n-button text size="tiny" @click="handleTest(ch.id)" :loading="testing === ch.id">测试</n-button>
@@ -134,7 +137,15 @@ async function handleDelete(id: number) {
       <n-form label-placement="left" label-width="80">
         <n-form-item label="名称"><n-input v-model:value="form.name" /></n-form-item>
         <n-form-item label="启用"><n-switch v-model:value="form.enabled" /></n-form-item>
-        <n-divider>{{ form.type === 'email' ? '邮件配置' : 'Webhook 配置' }}</n-divider>
+        <n-form-item label="触发通知">
+          <n-switch v-model:value="form.notify_on_trigger" />
+          <span style="margin-left:8px;font-size:12px;color:#999">发送开机/关机命令时通知</span>
+        </n-form-item>
+        <n-form-item label="成功通知">
+          <n-switch v-model:value="form.notify_on_success" />
+          <span style="margin-left:8px;font-size:12px;color:#999">设备确认开机/关机成功后通知</span>
+        </n-form-item>
+        <n-divider>{{ { email: '邮件配置', webhook: 'Webhook 配置', telegram: 'Telegram 配置' }[form.type] }}</n-divider>
         <template v-if="form.type === 'email'">
           <n-form-item label="SMTP"><n-input v-model:value="form.config.host" placeholder="smtp.example.com" /></n-form-item>
           <n-form-item label="端口"><n-input-number v-model:value="form.config.port" /></n-form-item>
@@ -143,6 +154,15 @@ async function handleDelete(id: number) {
           <n-form-item label="密码"><n-input v-model:value="form.config.password" type="password" show-password-on="click" /></n-form-item>
           <n-form-item label="发件人"><n-input v-model:value="form.config.from_addr" /></n-form-item>
           <n-form-item label="收件人"><n-input v-model:value="form.config.to_addr" /></n-form-item>
+        </template>
+        <template v-else-if="form.type === 'telegram'">
+          <n-form-item label="Bot Token"><n-input v-model:value="form.config.bot_token" placeholder="从 @BotFather 获取" style="font-family:monospace" /></n-form-item>
+          <n-form-item label="Chat ID">
+            <n-input v-model:value="form.config.chat_ids" placeholder="接收通知的 Chat ID，多个用逗号分隔" />
+          </n-form-item>
+          <div style="font-size:12px;color:#999;padding:8px 12px;background:rgba(0,122,255,0.05);border-radius:8px;border-left:3px solid #007AFF;margin-bottom:8px;line-height:1.6">
+            此处仅用于接收通知推送。如需交互式管理设备（开关机/查状态），请在「触发源」中添加 Telegram Bot 并开启「同步通知渠道」。
+          </div>
         </template>
         <template v-else>
           <n-form-item label="模板">

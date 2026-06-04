@@ -112,7 +112,7 @@ class TelegramBot:
             [{"text": "🔍 扫描局域网", "callback_data": "scan"}, {"text": "📋 操作日志", "callback_data": "logs"}],
         ]}
         await self.send_message(chat_id,
-            "<b>XiaoXue WoL</b> — 局域网设备管理\n\n"
+            "<b>Wol_xyz</b> — 局域网设备管理\n\n"
             "可用命令：\n"
             "/devices — 查看设备状态\n"
             "/groups — 查看设备分组\n"
@@ -226,6 +226,9 @@ class TelegramBot:
             from .log_writer import write_log
             ok, detail = await send_wol(device.mac)
             await write_log(db, device.id, "wake", "success" if ok else "failure", detail, "telegram")
+            if ok:
+                from .ping_monitor import register_pending_check
+                register_pending_check(device.id, "wake", device.name)
 
         icon = "✅" if ok else "❌"
         await self.send_message(chat_id, f"{icon} 开机 <b>{device.name}</b>\n{detail}")
@@ -248,6 +251,9 @@ class TelegramBot:
             pwd = decrypt(device.shutdown_password_enc)
             ok, detail = await send_shutdown(device.ip, device.shutdown_user, pwd)
             await write_log(db, device.id, "shutdown", "success" if ok else "failure", detail, "telegram")
+            if ok:
+                from .ping_monitor import register_pending_check
+                register_pending_check(device.id, "shutdown", device.name)
 
         icon = "✅" if ok else "❌"
         await self.send_message(chat_id, f"{icon} 关机 <b>{device.name}</b>\n{detail}")

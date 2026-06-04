@@ -16,3 +16,17 @@ class UserOut(BaseModel):
     username: str
 
     model_config = {"from_attributes": True}
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class UsernameChange(BaseModel):
+    new_username: str
+    password: str
+
+
+class SecretKeyRegen(BaseModel):
+    pass

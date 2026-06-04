@@ -41,7 +41,7 @@ async function handleLogin() {
             <defs><linearGradient id="g1" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#007AFF"/><stop offset="1" stop-color="#5856D6"/></linearGradient></defs>
           </svg>
         </div>
-        <h1>XiaoXue WoL</h1>
+        <h1>Wol_xyz</h1>
         <p>局域网设备管理</p>
       </div>
 

@@ -8,6 +8,7 @@ class DeviceCreate(BaseModel):
     ip: str
     mac: str
     adapter_name: str = ""
+    device_type: str = "computer"
     group_id: Optional[int] = None
     shutdown_enabled: bool = False
     shutdown_user: str = ""
@@ -19,6 +20,7 @@ class DeviceUpdate(BaseModel):
     ip: Optional[str] = None
     mac: Optional[str] = None
     adapter_name: Optional[str] = None
+    device_type: Optional[str] = None
     group_id: Optional[int] = None
     shutdown_enabled: Optional[bool] = None
     shutdown_user: Optional[str] = None
@@ -31,6 +33,7 @@ class DeviceOut(BaseModel):
     ip: str
     mac: str
     adapter_name: str
+    device_type: str
     group_id: Optional[int]
     shutdown_enabled: bool
     shutdown_user: str
@@ -40,3 +43,12 @@ class DeviceOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class BatchDeleteRequest(BaseModel):
+    ids: list[int]
+
+
+class BatchMoveRequest(BaseModel):
+    ids: list[int]
+    group_id: Optional[int] = None

@@ -35,7 +35,7 @@ async def _mqtt_loop(trigger_id: int, config: dict):
     port = config.get("port", 1883)
     username = config.get("username")
     password = config.get("password")
-    topic = config.get("topic", "xiaoxue_wol/#")
+    topic = config.get("topic", "wol_xyz/#")
     device_mac = config.get("device_mac", "")
 
     loop = asyncio.get_event_loop()
@@ -106,6 +106,9 @@ async def _handle_mqtt(action: str, device_mac: str):
             ok, detail = await send_shutdown(device.ip, device.shutdown_user, pwd)
 
         await write_log(db, device.id, action, "success" if ok else "failure", detail, "external")
+        if ok:
+            from .ping_monitor import register_pending_check
+            register_pending_check(device.id, action, device.name)
 
     from .notification import notify_all
     await notify_all(

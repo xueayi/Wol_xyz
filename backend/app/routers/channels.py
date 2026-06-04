@@ -56,5 +56,5 @@ async def test_channel(ch_id: int, db: AsyncSession = Depends(get_db)):
     if not ch:
         raise HTTPException(status_code=404, detail="通知渠道不存在")
     from ..services.notification import send_notification
-    ok = await send_notification(ch, "XiaoXue_WoL 测试通知", "如果您看到此消息，说明通知渠道配置正确。")
+    ok = await send_notification(ch, "Wol_xyz 测试通知", "如果您看到此消息，说明通知渠道配置正确。")
     return {"success": ok}

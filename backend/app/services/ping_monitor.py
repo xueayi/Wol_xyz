@@ -1,6 +1,7 @@
 import asyncio
 import platform
 import logging
+import time
 from datetime import datetime
 
 from sqlalchemy import select
@@ -9,6 +10,8 @@ from ..models.device import Device
 from ..config import settings
 
 logger = logging.getLogger(__name__)
+
+_pending_checks: dict[int, dict] = {}
 
 _ws_clients: set = set()
 _wake_event: asyncio.Event = None  # type: ignore
@@ -39,19 +42,32 @@ def has_active_clients() -> bool:
     return len(_ws_clients) > 0
 
 
+def register_pending_check(device_id: int, action: str, device_name: str):
+    """Register that we expect device_id to change state after a wake/shutdown command."""
+    _pending_checks[device_id] = {
+        "action": action,
+        "device_name": device_name,
+        "registered_at": time.time(),
+    }
+
+
 async def _ping(ip: str) -> bool:
     flag = "-n" if platform.system().lower() == "windows" else "-c"
     timeout_flag = "-w" if platform.system().lower() == "windows" else "-W"
     try:
         proc = await asyncio.create_subprocess_exec(
-            "ping", flag, "1", timeout_flag, "2", ip,
+            "ping", flag, "2", timeout_flag, "3", ip,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
-        await asyncio.wait_for(proc.wait(), timeout=5)
+        await asyncio.wait_for(proc.wait(), timeout=8)
         return proc.returncode == 0
     except Exception:
         return False
+
+
+_offline_counter: dict[int, int] = {}
+OFFLINE_THRESHOLD = 2
 
 
 async def _broadcast_status(device_id: int, is_online: bool):
@@ -85,14 +101,39 @@ async def ping_loop():
                 if tasks:
                     await asyncio.gather(*tasks.values(), return_exceptions=True)
 
+                expired = [did for did, info in _pending_checks.items()
+                           if time.time() - info["registered_at"] > 300]
+                for did in expired:
+                    _pending_checks.pop(did, None)
+
                 for d in devices:
                     alive = tasks[d.id].result() if not tasks[d.id].cancelled() else False
-                    changed = d.is_online != alive
-                    d.is_online = alive
+
                     if alive:
+                        _offline_counter.pop(d.id, None)
+                        new_online = True
+                    else:
+                        _offline_counter[d.id] = _offline_counter.get(d.id, 0) + 1
+                        new_online = _offline_counter[d.id] < OFFLINE_THRESHOLD and d.is_online
+
+                    changed = d.is_online != new_online
+                    d.is_online = new_online
+                    if new_online:
                         d.last_seen_at = datetime.utcnow()
                     if changed:
-                        await _broadcast_status(d.id, alive)
+                        await _broadcast_status(d.id, new_online)
+                        if d.id in _pending_checks:
+                            info = _pending_checks.pop(d.id)
+                            expected = (info["action"] == "wake" and new_online) or \
+                                       (info["action"] == "shutdown" and not new_online)
+                            if expected:
+                                from .notification import notify_all
+                                action_label = "开机" if info["action"] == "wake" else "关机"
+                                await notify_all(
+                                    f"任务成功 — {action_label}已确认",
+                                    f"设备: {info['device_name']} | 状态已确认{'在线' if new_online else '离线'}",
+                                    event="success",
+                                )
 
                 await db.commit()
         except Exception as e:

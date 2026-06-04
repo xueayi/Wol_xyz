@@ -25,13 +25,7 @@ const themeOverrides = {
     borderRadius: '10px',
     heightMedium: '40px',
   },
-  Select: {
-    borderRadius: '10px',
-  },
   Tag: {
-    borderRadius: '20px',
-  },
-  Modal: {
     borderRadius: '20px',
   },
 }

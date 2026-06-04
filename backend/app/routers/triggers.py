@@ -6,6 +6,7 @@ from typing import List, Optional
 from ..database import get_db, async_session
 from ..auth import get_current_user
 from ..models.trigger import TriggerSource
+from ..models.channel import NotificationChannel
 from ..models.device import Device
 from ..schemas.trigger import TriggerCreate, TriggerUpdate, TriggerOut
 
@@ -25,6 +26,8 @@ async def create_trigger(body: TriggerCreate, db: AsyncSession = Depends(get_db)
     db.add(trigger)
     await db.commit()
     await db.refresh(trigger)
+    if trigger.type == "telegram" and trigger.config.get("sync_notify"):
+        await _sync_telegram_channel(db, trigger)
     return trigger
 
 
@@ -38,6 +41,11 @@ async def update_trigger(trigger_id: int, body: TriggerUpdate, db: AsyncSession 
         setattr(trigger, k, v)
     await db.commit()
     await db.refresh(trigger)
+    if trigger.type == "telegram":
+        if trigger.config.get("sync_notify"):
+            await _sync_telegram_channel(db, trigger)
+        else:
+            await _remove_synced_channel(db, trigger.id)
     return trigger
 
 
@@ -47,8 +55,52 @@ async def delete_trigger(trigger_id: int, db: AsyncSession = Depends(get_db)):
     trigger = result.scalar_one_or_none()
     if not trigger:
         raise HTTPException(status_code=404, detail="触发源不存在")
+    if trigger.type == "telegram":
+        await _remove_synced_channel(db, trigger.id)
     await db.delete(trigger)
     await db.commit()
+
+
+async def _sync_telegram_channel(db: AsyncSession, trigger: TriggerSource):
+    """Create or update a notification channel that mirrors this Telegram trigger."""
+    result = await db.execute(
+        select(NotificationChannel).where(
+            NotificationChannel.type == "telegram",
+            NotificationChannel.config["_trigger_id"].as_integer() == trigger.id,
+        )
+    )
+    ch = result.scalar_one_or_none()
+    channel_config = {
+        "bot_token": trigger.config.get("bot_token", ""),
+        "chat_ids": trigger.config.get("allowed_chat_ids", ""),
+        "_trigger_id": trigger.id,
+    }
+    if ch:
+        ch.name = f"Telegram — {trigger.name}"
+        ch.config = channel_config
+        ch.enabled = trigger.enabled
+    else:
+        ch = NotificationChannel(
+            type="telegram",
+            name=f"Telegram — {trigger.name}",
+            config=channel_config,
+            enabled=trigger.enabled,
+        )
+        db.add(ch)
+    await db.commit()
+
+
+async def _remove_synced_channel(db: AsyncSession, trigger_id: int):
+    result = await db.execute(
+        select(NotificationChannel).where(
+            NotificationChannel.type == "telegram",
+            NotificationChannel.config["_trigger_id"].as_integer() == trigger_id,
+        )
+    )
+    ch = result.scalar_one_or_none()
+    if ch:
+        await db.delete(ch)
+        await db.commit()
 
 
 @router.api_route("/api/external/trigger", methods=["GET", "POST"])

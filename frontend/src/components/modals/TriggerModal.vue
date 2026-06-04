@@ -14,14 +14,14 @@ const form = ref({ type: 'http_api', name: '', config: {} as any, enabled: true 
 const saving = ref(false)
 
 const typeOptions = [
-  { label: 'HTTP API', value: 'http_api' },
+  { label: 'API', value: 'http_api' },
   { label: '巴法云 (Bemfa)', value: 'bemfa' },
   { label: 'MQTT', value: 'mqtt' },
   { label: 'Telegram Bot', value: 'telegram' },
 ]
 
 const typeLabel: Record<string, string> = {
-  http_api: 'HTTP API',
+  http_api: 'API',
   bemfa: '巴法云',
   mqtt: 'MQTT',
   telegram: 'Telegram',
@@ -36,8 +36,8 @@ function getDefaults(type: string): any {
   switch (type) {
     case 'http_api': return { token: '' }
     case 'bemfa': return { uid: '', topic: '' }
-    case 'mqtt': return { broker: '', port: 1883, username: '', password: '', topic: 'xiaoxue_wol/#' }
-    case 'telegram': return { bot_token: '', allowed_chat_ids: '' }
+    case 'mqtt': return { broker: '', port: 1883, username: '', password: '', topic: 'wol_xyz/#' }
+    case 'telegram': return { bot_token: '', allowed_chat_ids: '', sync_notify: false }
     default: return {}
   }
 }
@@ -149,7 +149,7 @@ function generateToken() {
           <n-form-item label="端口"><n-input-number v-model:value="form.config.port" :min="1" :max="65535" style="width:140px" /></n-form-item>
           <n-form-item label="用户名"><n-input v-model:value="form.config.username" placeholder="可选" /></n-form-item>
           <n-form-item label="密码"><n-input v-model:value="form.config.password" type="password" show-password-on="click" placeholder="可选" /></n-form-item>
-          <n-form-item label="Topic"><n-input v-model:value="form.config.topic" placeholder="xiaoxue_wol/#" /></n-form-item>
+          <n-form-item label="Topic"><n-input v-model:value="form.config.topic" placeholder="wol_xyz/#" /></n-form-item>
           <div class="config-hint">
             向 Topic 发送 <code>on</code> 开机 / <code>off</code> 关机
           </div>
@@ -159,6 +159,10 @@ function generateToken() {
           <n-form-item label="Bot Token"><n-input v-model:value="form.config.bot_token" placeholder="从 @BotFather 获取" style="font-family:monospace" /></n-form-item>
           <n-form-item label="允许的 Chat ID">
             <n-input v-model:value="form.config.allowed_chat_ids" placeholder="多个用逗号分隔，留空则不限制" />
+          </n-form-item>
+          <n-form-item label="同步通知渠道">
+            <n-switch v-model:value="form.config.sync_notify" />
+            <span style="margin-left:8px;font-size:12px;color:#999">开启后自动将此 Bot 添加为通知渠道，向 Chat ID 推送通知</span>
           </n-form-item>
           <div class="config-hint">
             在 Telegram 中搜索 <a href="https://t.me/BotFather" target="_blank" style="color:#007AFF">@BotFather</a> 创建 Bot 获取 Token。Chat ID 可通过 <a href="https://t.me/userinfobot" target="_blank" style="color:#007AFF">@userinfobot</a> 获取。Bot 支持命令：/devices 查看设备、点击按钮开关机、/scan 扫描局域网、/logs 查看日志。

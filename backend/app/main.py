@@ -17,7 +17,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-logger = logging.getLogger("xiaoxue_wol")
+logger = logging.getLogger("wol_xyz")
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
@@ -51,10 +51,10 @@ async def lifespan(app: FastAPI):
     stop_telegram()
 
 
-app = FastAPI(title="XiaoXue_WoL", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Wol_xyz", version="1.0.0", lifespan=lifespan)
 
 # --- Register routers ---
-from .routers import auth, devices, groups, schedules, channels, triggers, logs, dashboard, scan  # noqa: E402
+from .routers import auth, devices, groups, schedules, channels, triggers, logs, dashboard, scan, announcements  # noqa: E402
 
 app.include_router(auth.router)
 app.include_router(devices.router)
@@ -66,6 +66,7 @@ app.include_router(triggers.mgmt_router)
 app.include_router(logs.router)
 app.include_router(dashboard.router)
 app.include_router(scan.router)
+app.include_router(announcements.router)
 
 
 # --- WebSocket for live device status ---

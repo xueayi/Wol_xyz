@@ -1,13 +1,11 @@
 services:
-  xiaoxue-wol:
+  wol-xyz:
+    image: xueayi/wol-xyz:latest
     build: .
-    container_name: xiaoxue-wol
+    container_name: wol-xyz
     network_mode: host
     restart: unless-stopped
     volumes:
       - ./data:/app/data
     environment:
-      - WOM_WEB_PORT=39090
-      - WOM_ADMIN_USERNAME=admin
-      - WOM_ADMIN_PASSWORD=admin
-      - WOM_SECRET_KEY=please-change-this-secret-key
+      - WEB_PORT=39090

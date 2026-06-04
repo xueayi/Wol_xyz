@@ -30,10 +30,10 @@ fi
 WORKDIR=$(cd "$(dirname "$MAIN_PY")" && pwd)
 
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
-  UNIT_PATH=/etc/systemd/system/wom.service
+  UNIT_PATH=/etc/systemd/system/wol-xyz.service
   cat > "$UNIT_PATH" <<EOF
 [Unit]
-Description=Wake On Mijia daemon
+Description=Wol_xyz daemon
 After=network-online.target
 Wants=network-online.target
 
@@ -52,18 +52,18 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
   systemctl daemon-reload
-  systemctl enable wom
-  systemctl restart wom
-  echo "已使用 systemctl 安装并启动 wom"
+  systemctl enable wol-xyz
+  systemctl restart wol-xyz
+  echo "已使用 systemctl 安装并启动 wol-xyz"
 else
-  INIT_PATH=/etc/init.d/wom
+  INIT_PATH=/etc/init.d/wol-xyz
   cat > "$INIT_PATH" <<'EOF'
 #!/bin/sh /etc/rc.common
 START=95
 STOP=10
 USE_PROCD=1
-NAME="wom"
-PIDFILE="/var/run/wom.pid"
+NAME="wol-xyz"
+PIDFILE="/var/run/wol-xyz.pid"
 DAEMON="%PYTHON3%"
 DAEMON_OPTS="%MAIN_PY%"
 WORKDIR="%WORKDIR%"
@@ -84,13 +84,13 @@ EOF
   sed -i "s|%WORKDIR%|$WORKDIR|g" "$INIT_PATH"
   chmod +x "$INIT_PATH"
   if command -v update-rc.d >/dev/null 2>&1; then
-    update-rc.d wom defaults
+    update-rc.d wol-xyz defaults
   elif command -v chkconfig >/dev/null 2>&1; then
-    chkconfig --add wom || true
-    chkconfig wom on || true
+    chkconfig --add wol-xyz || true
+    chkconfig wol-xyz on || true
   fi
   "$INIT_PATH" restart
-  echo "已使用 init 安装并启动 wom"
-  ps | grep wom
+  echo "已使用 init 安装并启动 wol-xyz"
+  ps | grep wol-xyz
   "$INIT_PATH" status
 fi

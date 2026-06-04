@@ -109,6 +109,9 @@ async def _handle_message(msg: str, topic: str, device_mac: str):
             ok, detail = await send_shutdown(device.ip, device.shutdown_user, pwd)
 
         await write_log(db, device.id, action, "success" if ok else "failure", detail, "external")
+        if ok:
+            from .ping_monitor import register_pending_check
+            register_pending_check(device.id, action, device.name)
 
     from .notification import notify_all
     await notify_all(

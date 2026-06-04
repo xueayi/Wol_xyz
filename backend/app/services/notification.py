@@ -16,6 +16,8 @@ async def send_notification(channel: NotificationChannel, title: str, body: str)
             return await _send_email(channel.config, title, body)
         elif channel.type == "webhook":
             return await _send_webhook(channel.config, title, body)
+        elif channel.type == "telegram":
+            return await _send_telegram(channel.config, title, body)
         else:
             logger.warning("Unknown channel type: %s", channel.type)
             return False
@@ -84,11 +86,39 @@ async def _send_webhook(config: dict, title: str, body: str) -> bool:
     return True
 
 
-async def notify_all(title: str, body: str):
+async def _send_telegram(config: dict, title: str, body: str) -> bool:
+    bot_token = config.get("bot_token", "")
+    chat_ids_raw = config.get("chat_ids", "")
+    if not bot_token or not chat_ids_raw:
+        return False
+
+    chat_ids = []
+    if isinstance(chat_ids_raw, list):
+        chat_ids = [int(x) for x in chat_ids_raw]
+    elif isinstance(chat_ids_raw, str) and chat_ids_raw.strip():
+        chat_ids = [int(x.strip()) for x in chat_ids_raw.split(",") if x.strip()]
+
+    text = f"<b>{title}</b>\n{body}"
+    async with httpx.AsyncClient(timeout=10) as client:
+        for cid in chat_ids:
+            await client.post(
+                f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                json={"chat_id": cid, "text": text, "parse_mode": "HTML"},
+            )
+    return True
+
+
+async def notify_all(title: str, body: str, event: str = "trigger"):
+    """Send to all enabled channels that subscribe to this event type.
+    event: 'trigger' for command-sent notifications, 'success' for confirmed state-change notifications.
+    """
     async with async_session() as db:
-        result = await db.execute(
-            select(NotificationChannel).where(NotificationChannel.enabled.is_(True))
-        )
+        query = select(NotificationChannel).where(NotificationChannel.enabled.is_(True))
+        if event == "trigger":
+            query = query.where(NotificationChannel.notify_on_trigger.is_(True))
+        elif event == "success":
+            query = query.where(NotificationChannel.notify_on_success.is_(True))
+        result = await db.execute(query)
         channels = result.scalars().all()
 
     for ch in channels:
