@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-06-05
+
+### Fixed
+
+- 修复设备概览列表视图按钮点击无效的问题（viewMode 未传递给子组件）
+- 实现完整的列表视图模式（紧凑横向布局，显示状态点、设备名、IP、MAC、最后在线时间及操作按钮）
+
 ## [0.3.0] - 2026-06-04
 
 ### Added

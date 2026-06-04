@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { wakeDevice, shutdownDevice } from '../api/devices'
 
-const props = defineProps<{ device: any; batchMode?: boolean; selected?: boolean }>()
+const props = defineProps<{ device: any; viewMode?: 'card' | 'list'; batchMode?: boolean; selected?: boolean }>()
 const emit = defineEmits(['refresh', 'edit', 'toggle-select'])
 const msg = useMessage()
 const waking = ref(false)
@@ -61,7 +61,8 @@ function timeAgo(dt: string | null) {
 </script>
 
 <template>
-  <div class="device-card" :class="{ online: device.is_online, 'batch-selected': batchMode && selected }">
+  <!-- Card mode -->
+  <div v-if="viewMode !== 'list'" class="device-card" :class="{ online: device.is_online, 'batch-selected': batchMode && selected }">
     <div class="card-header">
       <div v-if="batchMode" class="batch-checkbox" @click.stop="emit('toggle-select', device.id)">
         <div class="checkbox-inner" :class="{ checked: selected }">
@@ -112,6 +113,37 @@ function timeAgo(dt: string | null) {
       <button class="action-btn shut" :class="{ disabled: !device.shutdown_enabled }" :disabled="!device.shutdown_enabled || shutting" @click="handleShutdown">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
         {{ shutting ? '...' : '关机' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- List mode -->
+  <div v-else class="device-list-row" :class="{ online: device.is_online, 'batch-selected': batchMode && selected }">
+    <div v-if="batchMode" class="batch-checkbox" @click.stop="emit('toggle-select', device.id)">
+      <div class="checkbox-inner" :class="{ checked: selected }">
+        <svg v-if="selected" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    </div>
+    <div class="list-status-dot" :class="device.is_online ? 'dot-online' : 'dot-offline'" />
+    <div class="list-avatar" :class="{ 'avatar-online': device.is_online }">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="deviceIcon"></svg>
+    </div>
+    <span class="list-name" @click="emit('edit', device)">{{ device.name }}</span>
+    <span class="list-ip">{{ device.ip }}</span>
+    <span class="list-mac">{{ device.mac }}</span>
+    <span class="list-seen">{{ timeAgo(device.last_seen_at) }}</span>
+    <div class="list-actions">
+      <button class="list-action-btn wake" :disabled="device.is_online || waking" @click="handleWake" title="开机">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+      </button>
+      <button class="list-action-btn shut" :disabled="!device.shutdown_enabled || shutting" @click="handleShutdown" title="关机">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
+      </button>
+      <button class="list-action-btn edit" @click.stop="emit('edit', device)" title="编辑">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
       </button>
     </div>
   </div>
@@ -294,4 +326,108 @@ function timeAgo(dt: string | null) {
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+/* List mode */
+.device-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: rgba(255,255,255,0.95);
+  transition: background 0.15s;
+}
+.device-list-row:hover {
+  background: rgba(0,122,255,0.03);
+}
+.device-list-row.online {
+  /* subtle left accent handled by dot */
+}
+.device-list-row.batch-selected {
+  background: rgba(0, 122, 255, 0.06);
+}
+.list-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-online { background: #34C759; box-shadow: 0 0 6px rgba(52,199,89,0.4); }
+.dot-offline { background: #c7c7cc; }
+.list-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #f2f2f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8e8e93;
+  flex-shrink: 0;
+}
+.list-avatar.avatar-online {
+  background: rgba(52,199,89,0.12);
+  color: #34C759;
+}
+.list-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1c1c1e;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 100px;
+  max-width: 160px;
+  transition: color 0.2s;
+}
+.list-name:hover { color: #007AFF; }
+.list-ip {
+  font-size: 13px;
+  color: #636366;
+  white-space: nowrap;
+  min-width: 110px;
+}
+.list-mac {
+  font-size: 12px;
+  color: #8e8e93;
+  font-family: "SF Mono", "Menlo", monospace;
+  white-space: nowrap;
+  min-width: 130px;
+}
+.list-seen {
+  font-size: 12px;
+  color: #aeaeb2;
+  white-space: nowrap;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.list-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.list-action-btn {
+  border: none;
+  background: none;
+  padding: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  color: #8e8e93;
+}
+.list-action-btn:hover { background: rgba(0,0,0,0.04); }
+.list-action-btn.wake { color: #007AFF; }
+.list-action-btn.wake:hover { background: rgba(0,122,255,0.1); }
+.list-action-btn.shut { color: #FF3B30; }
+.list-action-btn.shut:hover { background: rgba(255,59,48,0.1); }
+.list-action-btn.edit { color: #8e8e93; }
+.list-action-btn.edit:hover { color: #007AFF; background: rgba(0,122,255,0.08); }
+.list-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.list-action-btn:disabled:hover { background: none; }
 </style>

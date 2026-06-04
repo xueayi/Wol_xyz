@@ -268,6 +268,7 @@ onUnmounted(() => { ws?.close() })
             v-for="group in filteredGroups"
             :key="group.id"
             :group="group"
+            :view-mode="viewMode"
             :batch-mode="batchMode"
             :selected-devices="selectedDevices"
             @refresh="refresh"

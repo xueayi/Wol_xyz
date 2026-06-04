@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import DeviceCard from './DeviceCard.vue'
 
-defineProps<{ group: any; batchMode?: boolean; selectedDevices?: number[] }>()
+defineProps<{ group: any; viewMode?: 'card' | 'list'; batchMode?: boolean; selectedDevices?: number[] }>()
 const emit = defineEmits(['refresh', 'editDevice', 'toggleSelect'])
 const collapsed = ref(false)
 </script>
@@ -22,11 +22,12 @@ const collapsed = ref(false)
       </svg>
     </div>
     <Transition name="slide">
-      <div v-show="!collapsed" class="group-devices">
+      <div v-show="!collapsed" class="group-devices" :class="{ 'group-devices-list': viewMode === 'list' }">
         <DeviceCard
           v-for="device in group.devices"
           :key="device.id"
           :device="device"
+          :view-mode="viewMode"
           :batch-mode="batchMode"
           :selected="selectedDevices?.includes(device.id)"
           @refresh="emit('refresh')"
@@ -81,6 +82,13 @@ const collapsed = ref(false)
   grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
   gap: 12px;
   padding-bottom: 12px;
+}
+.group-devices-list {
+  grid-template-columns: 1fr;
+  gap: 1px;
+  background: rgba(0,0,0,0.04);
+  border-radius: 12px;
+  overflow: hidden;
 }
 .slide-enter-active,
 .slide-leave-active {
