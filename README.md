@@ -18,9 +18,9 @@
 - **远程关机**：SSH 连接执行关机命令（支持密码认证）
 - **定时任务**：可视化频率配置（每天/每周/每月），替代原始 cron 表达式
 - **外部触发源**：
-  - 巴法云（Bemfa）TCP 协议 — 支持米家/小爱/Home Assistant
-  - API Token — 通用 REST 接口
-  - MQTT — IoT 标准协议
+  - 巴法云（Bemfa）TCP 协议 — 支持米家/小爱语音控制
+  - API Token — 通用 REST 接口，可对接 Home Assistant 等平台
+  - MQTT — IoT 标准协议，支持 Home Assistant 等智能家居平台
   - Telegram Bot — 交互式设备管理（查看状态/开关机/扫描/日志）
 - **通知渠道**：邮件（SMTP）、Webhook（内置飞书/企业微信模板）、Telegram，支持多实例
 - **通知类型**：可按渠道独立配置「触发通知」和「任务成功通知」（设备状态确认）
@@ -29,7 +29,9 @@
 
 ## 快速开始
 
-### Docker 部署（推荐）
+### Docker 部署（推荐，仅限 Linux）
+
+> **注意**：macOS 不支持 Docker 的 host 网络模式，无法使用 Docker 部署。请使用下方「本地开发」方式运行。
 
 创建 `docker-compose.yml` 文件：
 
@@ -134,13 +136,15 @@ curl "http://<IP>:39090/api/external/trigger?token=YOUR_TOKEN&mac=AA:BB:CC:DD:EE
 curl -X POST "http://<IP>:39090/api/external/trigger?token=YOUR_TOKEN&device_id=1&action=shutdown"
 ```
 
+也可通过 Home Assistant 的 REST 命令或 Shell Command 集成调用此 API 控制设备。
+
 ### 巴法云
 
 在触发源管理中配置巴法云 UID 和 Topic，即可通过米家/小爱语音控制设备开关机。
 
 ### MQTT
 
-配置 MQTT Broker 地址和 Topic，发送 `on`/`off` 消息触发设备操作。
+配置 MQTT Broker 地址和 Topic，发送 `on`/`off` 消息触发设备操作。支持与 Home Assistant 的 MQTT 集成联动，通过 HA 自动化控制设备。
 
 ### Telegram Bot
 
