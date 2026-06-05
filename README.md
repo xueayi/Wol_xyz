@@ -32,7 +32,7 @@
 
 ## 快速开始
 
-### Docker 部署（推荐，仅限 Linux）
+### Docker 部署
 
 > **注意**：macOS 不支持 Docker 的 host 网络模式，无法使用 Docker 部署。请使用下方「本地开发」方式运行。
 
@@ -62,25 +62,6 @@ docker compose up -d
 
 > **重要**：使用 `network_mode: host` 确保 WOL 广播和局域网扫描正常工作。
 
-### 从源码构建 Docker 镜像
-
-```bash
-# 克隆仓库
-git clone https://github.com/xueayi/Wol_XYZ.git
-cd Wol_XYZ
-
-# 构建镜像
-docker build -t wol-xyz:latest .
-
-# 使用 docker-compose 启动（会自动使用本地构建的镜像）
-docker compose up -d
-
-# 或直接 docker run
-docker run -d --name wol-xyz --network host \
-  -v ./data:/app/data \
-  -e TZ=Asia/Shanghai \
-  wol-xyz:latest
-```
 
 ### 环境变量
 
