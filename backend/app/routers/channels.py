@@ -6,6 +6,7 @@ from typing import List
 from ..database import get_db
 from ..auth import get_current_user
 from ..models.channel import NotificationChannel
+from ..models.trigger import TriggerSource
 from ..schemas.channel import ChannelCreate, ChannelUpdate, ChannelOut
 
 router = APIRouter(prefix="/api/channels", tags=["channels"], dependencies=[Depends(get_current_user)])
@@ -45,8 +46,16 @@ async def delete_channel(ch_id: int, db: AsyncSession = Depends(get_db)):
     ch = result.scalar_one_or_none()
     if not ch:
         raise HTTPException(status_code=404, detail="通知渠道不存在")
+    trigger_id = ch.config.get("_trigger_id") if ch.type == "telegram" else None
     await db.delete(ch)
     await db.commit()
+    if trigger_id:
+        res = await db.execute(select(TriggerSource).where(TriggerSource.id == trigger_id))
+        trigger = res.scalar_one_or_none()
+        if trigger and trigger.config.get("sync_notify"):
+            new_config = {**trigger.config, "sync_notify": False}
+            trigger.config = new_config
+            await db.commit()
 
 
 @router.post("/{ch_id}/test")

@@ -7,7 +7,7 @@ const emit = defineEmits(['add'])
   <div class="channel-status">
     <div class="section-header">
       <span class="section-title">通知渠道状态</span>
-      <span class="manage-link" @click="emit('add')">+ 新建</span>
+      <span class="manage-link" @click="emit('add')">管理</span>
     </div>
     <div v-if="channels.length === 0" class="empty">暂未配置通知渠道</div>
     <div v-for="ch in channels" :key="ch.id" class="channel-row">
