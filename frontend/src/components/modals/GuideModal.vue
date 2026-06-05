@@ -107,12 +107,17 @@ watch(() => props.show, (v) => {
                   <code>mkdir -p ~/.ssh &amp;&amp; echo "公钥内容" >> ~/.ssh/authorized_keys &amp;&amp; chmod 600 ~/.ssh/authorized_keys</code>
                 </div>
                 <div class="code-block">
-                  <div class="code-label">Windows（管理员 PowerShell）</div>
+                  <div class="code-label">Windows — 普通用户（PowerShell）</div>
                   <code><pre style="margin:0;white-space:pre;font-family:inherit;font-size:inherit">$key = "公钥内容"
 $path = "$env:USERPROFILE\.ssh\authorized_keys"
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.ssh"
 Add-Content $path $key</pre></code>
                 </div>
+                <div class="code-block">
+                  <div class="code-label">Windows — 管理员用户（以管理员身份运行 PowerShell）</div>
+                  <code>Add-Content C:\ProgramData\ssh\administrators_authorized_keys "公钥内容"</code>
+                </div>
+                <p class="trigger-tip"><b>重要：</b>Windows 管理员组用户的 SSH 密钥不读取 <code>~/.ssh/authorized_keys</code>，必须写入 <code>C:\ProgramData\ssh\administrators_authorized_keys</code>，否则会 Permission denied。如不确定，两个位置都添加即可。</p>
                 <p class="trigger-tip">也可以手动粘贴已有的 PEM 格式私钥（如 <code>id_ed25519</code>、<code>id_rsa</code>），无需使用生成功能</p>
               </n-collapse-item>
 

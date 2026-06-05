@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2026-06-06
+
+### Added
+
+- 使用指引补充 Windows 管理员用户公钥部署注意事项（必须写入 `administrators_authorized_keys`）
+- 已配置密钥时显示 `••••••••` 占位，明确提示凭据已存在
+- 已配置密码时 placeholder 显示 `•••••••• 已配置，输入新密码可覆盖`
+
+### Fixed
+
+- 公钥复制按钮在 HTTP 环境下失败：增加 `execCommand('copy')` 降级方案
+- SSH 关机引导提示框移至输入框下方，视觉更清晰
+- 公钥区域的 Windows 部署命令更新为管理员路径 `administrators_authorized_keys`
+- 编辑设备 payload 中空白凭据（含空格）不再误提交
+
 ## [1.0.3] - 2026-06-06
 
 ### Added

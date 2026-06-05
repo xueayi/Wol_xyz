@@ -82,8 +82,8 @@ async function handleSave() {
     delete payload.last_seen_at
     delete payload.created_at
     delete payload.updated_at
-    if (isEdit.value && !payload.shutdown_password) delete payload.shutdown_password
-    if (isEdit.value && !payload.shutdown_private_key) delete payload.shutdown_private_key
+    if (isEdit.value && !payload.shutdown_password?.trim()) delete payload.shutdown_password
+    if (isEdit.value && !payload.shutdown_private_key?.trim()) delete payload.shutdown_private_key
     if (isEdit.value) {
       await updateDevice(form.value.id, payload)
       msg.success('设备已更新')
@@ -121,8 +121,19 @@ async function handleGenerateKey() {
 }
 
 async function copyPublicKey() {
+  const text = generatedPublicKey.value
   try {
-    await navigator.clipboard.writeText(generatedPublicKey.value)
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.cssText = 'position:fixed;left:-9999px'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
     msg.success('公钥已复制到剪贴板')
   } catch { msg.error('复制失败') }
 }
@@ -152,13 +163,6 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
         </div>
       </n-form-item>
       <template v-if="form.shutdown_enabled">
-        <div class="shutdown-guide-inline">
-          <n-alert type="info" :show-icon="false" style="font-size:13px">
-            <b>配置步骤：</b>① 确保目标设备已开启 SSH → ② 填写用户名和认证凭据 → ③ 保存后测试关机
-            <br/>
-            <span class="guide-link" @click="emit('open-guide', 'wol')">查看详细配置说明</span>
-          </n-alert>
-        </div>
         <n-form-item label="SSH 用户名">
           <n-input v-model:value="form.shutdown_user" placeholder="目标设备的登录用户名" style="flex:1" />
         </n-form-item>
@@ -169,16 +173,23 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
         </n-form-item>
         <n-form-item v-if="form.shutdown_auth_type === 'password'" label="SSH 密码">
           <n-input v-model:value="form.shutdown_password" type="password" show-password-on="click"
-            :placeholder="hasExistingPassword ? '已配置，留空保持不变' : '输入 SSH 密码'" />
+            :placeholder="hasExistingPassword ? '•••••••• 已配置，输入新密码可覆盖' : '输入 SSH 密码'" />
         </n-form-item>
         <template v-if="form.shutdown_auth_type === 'key'">
           <n-form-item label="SSH 私钥">
             <div style="width:100%">
-              <n-input v-model:value="form.shutdown_private_key" type="textarea" :rows="4"
+              <div v-if="hasExistingKey && !form.shutdown_private_key && !showPublicKey" class="cred-mask-block">
+                <span>••••••••••••••••</span>
+                <span style="font-size:11px;color:#999;margin-left:8px">已配置，点击下方修改或重新生成</span>
+              </div>
+              <n-input v-else v-model:value="form.shutdown_private_key" type="textarea" :rows="4"
                 :placeholder="hasExistingKey ? '已配置，留空保持不变。也可粘贴新私钥或点击下方生成' : '粘贴 PEM 格式私钥，或点击下方按钮一键生成'" />
               <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
                 <n-button size="small" :loading="generatingKey" @click="handleGenerateKey">
                   生成密钥对
+                </n-button>
+                <n-button v-if="hasExistingKey && !form.shutdown_private_key && !showPublicKey" size="small" quaternary @click="form.shutdown_private_key = ' '">
+                  手动修改
                 </n-button>
                 <span style="font-size:11px;color:#999">生成后需将公钥部署到目标设备才能认证</span>
               </div>
@@ -192,10 +203,17 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
             <code class="pubkey-text">{{ generatedPublicKey }}</code>
             <p class="pubkey-hint">
               Linux/macOS: <code>echo "公钥" >> ~/.ssh/authorized_keys</code><br/>
-              Windows: 添加到 <code>%USERPROFILE%\.ssh\authorized_keys</code>
+              Windows 管理员: <code>Add-Content C:\ProgramData\ssh\administrators_authorized_keys "公钥"</code>
             </p>
           </div>
         </template>
+        <div class="shutdown-guide-inline">
+          <n-alert type="info" :show-icon="false" style="font-size:13px">
+            <b>配置步骤：</b>① 确保目标设备已开启 SSH → ② 填写用户名和认证凭据 → ③ 保存后测试关机
+            <br/>
+            <span class="guide-link" @click="emit('open-guide', 'wol')">查看详细配置说明</span>
+          </n-alert>
+        </div>
       </template>
     </n-form>
     <template #action>
@@ -259,6 +277,17 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
   font-size: 10px;
 }
 .shutdown-guide-inline {
-  margin: 0 0 12px;
+  margin: 4px 0 0;
+}
+.cred-mask-block {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: 'SF Mono', SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  color: #666;
+  letter-spacing: 2px;
+  display: flex;
+  align-items: center;
 }
 </style>
