@@ -146,18 +146,24 @@ async def _handle_message(msg: str, topic: str, device_mac: str):
             if not device.shutdown_enabled:
                 logger.warning("Bemfa: shutdown not enabled for %s", device.name)
                 return
-            pwd = decrypt(device.shutdown_password_enc)
-            ok, detail = await send_shutdown(device.ip, device.shutdown_user, pwd)
+            pwd = decrypt(device.shutdown_password_enc) if device.shutdown_auth_type == "password" else ""
+            key = decrypt(device.shutdown_key_enc) if device.shutdown_auth_type == "key" else None
+            ok, detail = await send_shutdown(
+                device.ip, device.shutdown_user, pwd,
+                private_key=key, device_type=device.device_type,
+            )
 
         await write_log(db, device.id, action, "success" if ok else "failure", detail, "external")
         if ok:
             from .ping_monitor import register_pending_check
             register_pending_check(device.id, action, device.name)
 
+        device_name = device.name
+
     from .notification import notify_all
     await notify_all(
         f"巴法云触发 {'成功' if ok else '失败'}",
-        f"设备: {device.name} | 动作: {action} | {detail}",
+        f"设备: {device_name} | 动作: {action} | {detail}",
     )
 
 

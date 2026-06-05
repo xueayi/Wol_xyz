@@ -1,3 +1,4 @@
+import secrets
 from pydantic_settings import BaseSettings
 from pathlib import Path
 
@@ -8,12 +9,14 @@ DATA_DIR.mkdir(exist_ok=True)
 _version_file = BASE_DIR / "VERSION"
 APP_VERSION = _version_file.read_text().strip() if _version_file.exists() else "dev"
 
+_DEFAULT_SECRET = "wol-xyz-change-me-in-production"
+
 
 class Settings(BaseSettings):
     APP_NAME: str = "Wol_xyz"
     WEB_PORT: int = 39090
     DATABASE_URL: str = f"sqlite+aiosqlite:///{DATA_DIR / 'wol_xyz.db'}"
-    SECRET_KEY: str = "wol-xyz-change-me-in-production"
+    SECRET_KEY: str = _DEFAULT_SECRET
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24h
     ADMIN_USERNAME: str = "admin"
@@ -25,4 +28,20 @@ class Settings(BaseSettings):
     model_config = {"env_prefix": "", "env_file": str(DATA_DIR / ".env"), "extra": "ignore"}
 
 
-settings = Settings()
+def _auto_generate_secret(s: Settings) -> Settings:
+    """Generate a random SECRET_KEY on first run if the user hasn't set one."""
+    if s.SECRET_KEY != _DEFAULT_SECRET:
+        return s
+    new_key = secrets.token_urlsafe(48)
+    env_file = DATA_DIR / ".env"
+    lines: list[str] = []
+    if env_file.exists():
+        lines = env_file.read_text().splitlines()
+    lines = [ln for ln in lines if not ln.startswith("SECRET_KEY=")]
+    lines.append(f"SECRET_KEY={new_key}")
+    env_file.write_text("\n".join(lines) + "\n")
+    s.SECRET_KEY = new_key
+    return s
+
+
+settings = _auto_generate_secret(Settings())

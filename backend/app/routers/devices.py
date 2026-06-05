@@ -32,6 +32,8 @@ async def create_device(body: DeviceCreate, db: AsyncSession = Depends(get_db)):
         group_id=body.group_id,
         shutdown_enabled=body.shutdown_enabled, shutdown_user=body.shutdown_user,
         shutdown_password_enc=encrypt(body.shutdown_password),
+        shutdown_auth_type=body.shutdown_auth_type,
+        shutdown_key_enc=encrypt(body.shutdown_private_key),
     )
     db.add(device)
     await db.commit()
@@ -48,6 +50,8 @@ async def update_device(device_id: int, body: DeviceUpdate, db: AsyncSession = D
     update_data = body.model_dump(exclude_unset=True)
     if "shutdown_password" in update_data:
         update_data["shutdown_password_enc"] = encrypt(update_data.pop("shutdown_password"))
+    if "shutdown_private_key" in update_data:
+        update_data["shutdown_key_enc"] = encrypt(update_data.pop("shutdown_private_key"))
     for k, v in update_data.items():
         if k == "mac" and v:
             v = v.upper()
@@ -90,8 +94,12 @@ async def shutdown_device(device_id: int, db: AsyncSession = Depends(get_db)):
     if not device.shutdown_enabled:
         raise HTTPException(status_code=400, detail="该设备未启用远程关机")
     from ..crypto import decrypt
-    pwd = decrypt(device.shutdown_password_enc)
-    success, detail = await send_shutdown(device.ip, device.shutdown_user, pwd)
+    pwd = decrypt(device.shutdown_password_enc) if device.shutdown_auth_type == "password" else ""
+    key = decrypt(device.shutdown_key_enc) if device.shutdown_auth_type == "key" else None
+    success, detail = await send_shutdown(
+        device.ip, device.shutdown_user, pwd,
+        private_key=key, device_type=device.device_type,
+    )
     from ..services.log_writer import write_log
     await write_log(db, device.id, "shutdown", "success" if success else "failure", detail, "manual")
     return {"success": success, "detail": detail}

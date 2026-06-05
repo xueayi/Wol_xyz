@@ -201,7 +201,7 @@ class TelegramBot:
 
         lines = ["<b>📋 最近操作日志</b>\n"]
         for log in logs:
-            icon = "✅" if log.status == "success" else "❌"
+            icon = "✅" if log.result == "success" else "❌"
             time_str = ensure_tz(log.created_at).strftime("%m-%d %H:%M")
             lines.append(f"{icon} [{time_str}] {log.action} — {log.detail[:40]}")
 
@@ -270,8 +270,12 @@ class TelegramBot:
             from .shutdown import send_shutdown
             from ..crypto import decrypt
             from .log_writer import write_log
-            pwd = decrypt(device.shutdown_password_enc)
-            ok, detail = await send_shutdown(device.ip, device.shutdown_user, pwd)
+            pwd = decrypt(device.shutdown_password_enc) if device.shutdown_auth_type == "password" else ""
+            key = decrypt(device.shutdown_key_enc) if device.shutdown_auth_type == "key" else None
+            ok, detail = await send_shutdown(
+                device.ip, device.shutdown_user, pwd,
+                private_key=key, device_type=device.device_type,
+            )
             await write_log(db, device.id, "shutdown", "success" if ok else "failure", detail, "telegram")
             if ok:
                 from .ping_monitor import register_pending_check

@@ -29,6 +29,8 @@ async def _migrate_add_columns(conn):
 
     migrations = [
         ("devices", "device_type", "VARCHAR(16) DEFAULT 'computer'"),
+        ("devices", "shutdown_auth_type", "VARCHAR(16) DEFAULT 'password'"),
+        ("devices", "shutdown_key_enc", "VARCHAR(4096) DEFAULT ''"),
     ]
     for table, column, col_def in migrations:
         try:

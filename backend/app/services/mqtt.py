@@ -37,7 +37,7 @@ async def _mqtt_loop(trigger_id: int, config: dict):
     """Run paho-mqtt in a thread since it's synchronous."""
     import paho.mqtt.client as mqtt
 
-    host = config.get("host", "localhost")
+    host = config.get("broker", config.get("host", "localhost"))
     port = config.get("port", 1883)
     username = config.get("username")
     password = config.get("password")
@@ -118,18 +118,24 @@ async def _handle_mqtt(action: str, device_mac: str):
             from ..crypto import decrypt
             if not device.shutdown_enabled:
                 return
-            pwd = decrypt(device.shutdown_password_enc)
-            ok, detail = await send_shutdown(device.ip, device.shutdown_user, pwd)
+            pwd = decrypt(device.shutdown_password_enc) if device.shutdown_auth_type == "password" else ""
+            key = decrypt(device.shutdown_key_enc) if device.shutdown_auth_type == "key" else None
+            ok, detail = await send_shutdown(
+                device.ip, device.shutdown_user, pwd,
+                private_key=key, device_type=device.device_type,
+            )
 
         await write_log(db, device.id, action, "success" if ok else "failure", detail, "external")
         if ok:
             from .ping_monitor import register_pending_check
             register_pending_check(device.id, action, device.name)
 
+        device_name = device.name
+
     from .notification import notify_all
     await notify_all(
         f"MQTT 触发 {'成功' if ok else '失败'}",
-        f"设备: {device.name} | 动作: {action} | {detail}",
+        f"设备: {device_name} | 动作: {action} | {detail}",
     )
 
 

@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy import select
@@ -90,8 +90,13 @@ async def ws_status(ws: WebSocket):
 if FRONTEND_DIR.exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
 
-    @app.get("/{full_path:path}")
+    _SPA_SKIP = {"api", "ws", "docs", "redoc", "openapi.json"}
+
+    @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
+        first_segment = full_path.split("/")[0] if full_path else ""
+        if first_segment in _SPA_SKIP or full_path in _SPA_SKIP:
+            raise HTTPException(status_code=404)
         file = FRONTEND_DIR / full_path
         if file.exists() and file.is_file():
             return FileResponse(file)

@@ -15,6 +15,8 @@ class DeviceCreate(BaseModel):
     shutdown_enabled: bool = False
     shutdown_user: str = ""
     shutdown_password: str = ""
+    shutdown_auth_type: str = "password"
+    shutdown_private_key: str = ""
 
 
 class DeviceUpdate(BaseModel):
@@ -27,6 +29,8 @@ class DeviceUpdate(BaseModel):
     shutdown_enabled: Optional[bool] = None
     shutdown_user: Optional[str] = None
     shutdown_password: Optional[str] = None
+    shutdown_auth_type: Optional[str] = None
+    shutdown_private_key: Optional[str] = None
 
 
 class DeviceOut(BaseModel):
@@ -39,6 +43,7 @@ class DeviceOut(BaseModel):
     group_id: Optional[int]
     shutdown_enabled: bool
     shutdown_user: str
+    shutdown_auth_type: str
     is_online: bool
     last_seen_at: Optional[datetime]
     created_at: datetime

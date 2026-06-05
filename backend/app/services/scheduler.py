@@ -75,10 +75,19 @@ async def _execute_task(task_id: int, device_id: int, action: str):
             from .wol import send_wol
             ok, detail = await send_wol(device.mac)
         elif action == "shutdown":
+            if not device.shutdown_enabled:
+                logger.warning("Task %d: shutdown not enabled for device %d", task_id, device_id)
+                from .log_writer import write_log as _wl
+                await _wl(db, device_id, action, "failure", "设备未启用远程关机", "scheduled")
+                return
             from .shutdown import send_shutdown
             from ..crypto import decrypt
-            pwd = decrypt(device.shutdown_password_enc)
-            ok, detail = await send_shutdown(device.ip, device.shutdown_user, pwd)
+            pwd = decrypt(device.shutdown_password_enc) if device.shutdown_auth_type == "password" else ""
+            key = decrypt(device.shutdown_key_enc) if device.shutdown_auth_type == "key" else None
+            ok, detail = await send_shutdown(
+                device.ip, device.shutdown_user, pwd,
+                private_key=key, device_type=device.device_type,
+            )
         else:
             logger.error("Task %d: unknown action %s", task_id, action)
             return

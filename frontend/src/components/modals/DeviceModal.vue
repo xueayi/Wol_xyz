@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { createDevice, updateDevice, deleteDevice } from '../../api/devices'
 import { getGroups } from '../../api/groups'
@@ -28,6 +28,14 @@ const deviceTypeOptions = [
   { label: '其他设备', value: 'other' },
 ]
 
+const shutdownCapableTypes = new Set(['windows', 'linux', 'macos'])
+const canShutdown = computed(() => shutdownCapableTypes.has(form.value.device_type))
+
+const authTypeOptions = [
+  { label: '密码', value: 'password' },
+  { label: '密钥', value: 'key' },
+]
+
 watch(() => props.show, async (v) => {
   if (!v) return
   const { data } = await getGroups()
@@ -37,7 +45,13 @@ watch(() => props.show, async (v) => {
     form.value = { ...props.device }
   } else {
     isEdit.value = false
-    form.value = { name: '', ip: '', mac: '', adapter_name: '', device_type: 'computer', group_id: null, shutdown_enabled: false, shutdown_user: '', shutdown_password: '' }
+    form.value = { name: '', ip: '', mac: '', adapter_name: '', device_type: 'computer', group_id: null, shutdown_enabled: false, shutdown_user: '', shutdown_password: '', shutdown_auth_type: 'password', shutdown_private_key: '' }
+  }
+})
+
+watch(() => form.value.device_type, () => {
+  if (!canShutdown.value) {
+    form.value.shutdown_enabled = false
   }
 })
 
@@ -91,11 +105,22 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
       </n-form-item>
       <n-divider />
       <n-form-item label="远程关机">
-        <n-switch v-model:value="form.shutdown_enabled" />
+        <n-switch v-model:value="form.shutdown_enabled" :disabled="!canShutdown" />
+        <span v-if="!canShutdown" style="margin-left:8px;font-size:12px;color:var(--n-text-color-3)">仅 Windows / Linux / macOS 设备支持</span>
       </n-form-item>
       <template v-if="form.shutdown_enabled">
         <n-form-item label="SSH 用户名"><n-input v-model:value="form.shutdown_user" /></n-form-item>
-        <n-form-item label="SSH 密码"><n-input v-model:value="form.shutdown_password" type="password" show-password-on="click" /></n-form-item>
+        <n-form-item label="认证方式">
+          <n-radio-group v-model:value="form.shutdown_auth_type">
+            <n-radio-button v-for="o in authTypeOptions" :key="o.value" :value="o.value" :label="o.label" />
+          </n-radio-group>
+        </n-form-item>
+        <n-form-item v-if="form.shutdown_auth_type === 'password'" label="SSH 密码">
+          <n-input v-model:value="form.shutdown_password" type="password" show-password-on="click" />
+        </n-form-item>
+        <n-form-item v-if="form.shutdown_auth_type === 'key'" label="SSH 私钥">
+          <n-input v-model:value="form.shutdown_private_key" type="textarea" :rows="4" placeholder="粘贴 SSH 私钥内容（PEM 格式）" />
+        </n-form-item>
       </template>
     </n-form>
     <template #action>

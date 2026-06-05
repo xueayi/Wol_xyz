@@ -92,8 +92,6 @@ function describeSchedule(cron: string): string {
   return `每天 ${time}`
 }
 
-watch(() => emit, loadData, { immediate: false })
-
 async function loadData() {
   const [s, d] = await Promise.all([getSchedules(), getDevices()])
   schedules.value = s.data

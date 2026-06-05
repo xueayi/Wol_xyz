@@ -19,6 +19,8 @@ class Device(Base):
     shutdown_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     shutdown_user: Mapped[str] = mapped_column(String(64), default="")
     shutdown_password_enc: Mapped[str] = mapped_column(String(256), default="")
+    shutdown_auth_type: Mapped[str] = mapped_column(String(16), default="password")
+    shutdown_key_enc: Mapped[str] = mapped_column(String(4096), default="")
     is_online: Mapped[bool] = mapped_column(Boolean, default=False)
     last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=tz_now)

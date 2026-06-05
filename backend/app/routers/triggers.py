@@ -1,3 +1,4 @@
+import hmac
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -135,7 +136,10 @@ async def external_trigger(
             select(TriggerSource).where(TriggerSource.type == "http_api", TriggerSource.enabled.is_(True))
         )).scalars().all()
 
-        valid = any(t.config.get("token") == token for t in triggers)
+        valid = any(
+            hmac.compare_digest(t.config.get("token", ""), token)
+            for t in triggers
+        )
         if not valid:
             raise HTTPException(status_code=403, detail="Token 无效")
 
@@ -157,8 +161,12 @@ async def external_trigger(
             from ..crypto import decrypt
             if not device.shutdown_enabled:
                 raise HTTPException(status_code=400, detail="该设备未启用远程关机")
-            pwd = decrypt(device.shutdown_password_enc)
-            ok, detail = await send_shutdown(device.ip, device.shutdown_user, pwd)
+            pwd = decrypt(device.shutdown_password_enc) if device.shutdown_auth_type == "password" else ""
+            key = decrypt(device.shutdown_key_enc) if device.shutdown_auth_type == "key" else None
+            ok, detail = await send_shutdown(
+                device.ip, device.shutdown_user, pwd,
+                private_key=key, device_type=device.device_type,
+            )
         else:
             raise HTTPException(status_code=400, detail=f"不支持的动作: {action}")
 

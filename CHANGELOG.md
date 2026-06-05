@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-06-05
+
+### Added
+
+- SSH 密钥对认证：远程关机支持密码或 PEM 私钥两种认证方式
+- 多平台关机命令：自动根据设备类型（Windows/Linux/macOS）选择正确的关机指令
+- JWT 密钥自动生成：首次启动时自动生成安全的 JWT Secret，无需手动配置
+
+### Changed
+
+- 远程关机与设备类型绑定：仅 Windows/Linux/macOS 设备可启用远程关机，去除独立的"目标系统"选择
+- SSH 密码传递改用 `sshpass -e` 环境变量方式，避免密码出现在进程参数列表中
+- API Token 比较改用 `hmac.compare_digest` 常量时间比较，防止时序攻击
+
+### Fixed
+
+- MQTT 触发源 broker/host 字段名不一致导致连接失败
+- Telegram Bot 日志状态字段名错误（`log.status` → `log.result`）
+- 定时关机任务未检查 `shutdown_enabled` 导致对未启用关机的设备发送 SSH 命令
+- 巴法云/MQTT 通知中 `device_name` 变量作用域错误
+- SPA catch-all 路由拦截 `/docs`、`/redoc` 等 FastAPI 内置路径
+- 定时任务弹窗中无效的 `watch(emit)` 监听
+
+### Removed
+
+- 删除遗留的 `main.py`、`config.ini`、`install.sh`（旧版单文件架构残留）
+- 移除独立的 `os_type` 字段，关机命令直接从 `device_type` 推导
+
 ## [0.3.3] - 2026-06-05
 
 ### Added
