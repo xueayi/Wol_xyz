@@ -9,11 +9,11 @@
 ## 功能特性
 
 - **多设备管理**：通过卡片式界面管理所有局域网设备
-- **设备类型识别**：OUI 指纹自动推测 + 路由器 DNS 反向解析获取设备名，支持手动选择（Windows/macOS/Linux/iPad/iPhone/Android/NAS/路由器等）
+- **设备类型识别**：hostname 关键词自动推测 + 路由器 DNS 反向解析获取设备名，支持手动选择（Windows/macOS/Linux/iPad/iPhone/Android/NAS/路由器等）
 - **设备分组**：按办公设备、家庭设备等自定义分类
 - **批量管理**：全选/批量删除/批量移动分组
 - **实时状态监控**：ICMP Ping 定期检测设备在线状态，WebSocket 实时推送，双次确认防误判
-- **局域网扫描**：UDP 广播 + ARP 表发现设备，自动获取设备名称和类型，过滤已添加设备
+- **局域网扫描**：多轮 UDP 探测 + 子网广播 + 自适应 ARP 等待，多方法并发解析 hostname，扫描防抖锁
 - **远程开机**：WOL 魔术包唤醒（需目标设备开启 WOL）
 - **远程关机**：SSH 连接执行关机命令（支持密码和密钥对认证，自动适配 Windows/Linux/macOS 关机指令）
 - **定时任务**：可视化频率配置（每天/每周/每月），替代原始 cron 表达式
@@ -88,6 +88,9 @@ docker run -d --name wol-xyz --network host \
 |------|--------|------|
 | `WEB_PORT` | `39090` | Web 面板端口 |
 | `PING_INTERVAL` | `60` | Ping 检测间隔（秒） |
+| `SCAN_SUBNET` | 自动检测 | 扫描子网 CIDR（如 `192.168.1.0/24`），留空自动检测 |
+| `SCAN_TIMEOUT` | `6` | ARP 等待最大秒数 |
+| `SCAN_ROUNDS` | `3` | UDP 探测轮数 |
 | `TZ` | `Asia/Shanghai` | 时区，影响所有时间显示（如 `America/New_York`、`Europe/London`） |
 
 > 默认管理员账号 `admin` / `admin`，JWT 密钥自动生成。均可在 Web 面板「用户管理」中修改。
@@ -176,7 +179,8 @@ curl "http://<IP>:39090/api/external/trigger?token=YOUR_TOKEN&mac=AA:BB:CC:DD:EE
 curl -X POST "http://<IP>:39090/api/external/trigger?token=YOUR_TOKEN&device_id=1&action=shutdown"
 ```
 
-#### Home Assistant 集成示例
+<details>
+<summary>Home Assistant 集成示例</summary>
 
 在 Home Assistant 的 `configuration.yaml` 中添加：
 
@@ -214,6 +218,8 @@ automation:
 ```
 
 > **提示**：也可通过 Shell Command 集成调用 curl 命令，适用于更复杂的场景。
+
+</details>
 
 ### 巴法云
 

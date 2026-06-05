@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-06-06
+
+### Changed
+
+- 局域网扫描重构：多轮 UDP 探测 + 子网广播 + Linux 原生 ARP 广播，大幅提升设备发现率和稳定性
+- 自适应 ARP 等待：轮询 ARP 表直至设备数稳定，替代固定 3 秒等待
+- hostname 解析加速：多方法并发竞赛取首个结果，替代串行尝试（单设备从最长 18s 降至 3s 内）
+- 本机 IP 检测优先从物理网卡获取，避免 VPN/代理干扰导致扫描失败
+- 使用指引中 API 触发源的 Home Assistant 示例改为折叠展示
+- 触发源连接失败改为指数退避重试（5s → 300s），首次失败降为 WARNING，抑制重复日志刷屏
+- httpx 日志级别设为 WARNING，减少无效 INFO 输出
+
+### Added
+
+- 扫描防抖锁：同一时间仅允许一次扫描，重复请求返回 409
+- 新增扫描配置环境变量：SCAN_SUBNET / SCAN_TIMEOUT / SCAN_ROUNDS / SCAN_HOSTNAME_CONCURRENCY / SCAN_HOSTNAME_TIMEOUT
+- ARP 子网过滤兜底：检测子网与实际 LAN 不匹配时自动回退到全量 ARP 结果
+
+### Removed
+
+- 移除 mac-vendor-lookup 依赖及厂商识别功能（大量随机 MAC 导致识别无效且产生异常日志）
+- 移除 oui_detect.py 模块，设备类型改为纯 hostname 关键词匹配
+
 ## [0.4.0] - 2026-06-05
 
 ### Added

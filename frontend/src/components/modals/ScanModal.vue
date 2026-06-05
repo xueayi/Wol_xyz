@@ -48,8 +48,10 @@ async function handleScan() {
     existingMacs.value = data.existing_macs || []
     if (results.value.length === 0) msg.info('未发现设备')
     else if (newDevices.value.length === 0) msg.info('所有设备均已添加')
-  } catch { msg.error('扫描失败') }
-  finally { scanning.value = false }
+  } catch (e: any) {
+    if (e?.response?.status === 409) msg.warning('扫描正在进行中，请稍候再试')
+    else msg.error('扫描失败')
+  } finally { scanning.value = false }
 }
 
 function selectAllNew() {

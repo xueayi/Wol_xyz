@@ -83,19 +83,32 @@ async def _mqtt_loop(trigger_id: int, config: dict):
     client.on_disconnect = on_disconnect
     client.on_message = on_message
 
+    backoff = 5
+    fail_count = 0
+    ever_connected = False
     while True:
         try:
             await loop.run_in_executor(None, lambda: client.connect(host, port, 60))
+            if not ever_connected:
+                ever_connected = True
+            backoff = 5
+            fail_count = 0
             await loop.run_in_executor(None, client.loop_forever)
         except asyncio.CancelledError:
             _status.pop(trigger_id, None)
             client.disconnect()
             break
         except Exception as e:
+            fail_count += 1
             _status[trigger_id] = "disconnected"
-            logger.error("MQTT trigger %d error: %s", trigger_id, e)
+            if fail_count == 1:
+                log = logger.error if ever_connected else logger.warning
+                log("MQTT trigger %d error: %s", trigger_id, e)
+            elif fail_count == 2:
+                logger.warning("MQTT trigger %d still failing, retrying every %ds", trigger_id, backoff)
             _status[trigger_id] = "connecting"
-            await asyncio.sleep(5)
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 300)
 
 
 async def _handle_mqtt(action: str, device_mac: str):

@@ -86,10 +86,11 @@ const activeTab = ref('quickstart')
                   <code>curl "http://&lt;IP&gt;:39090/api/external/trigger?token=xxx&amp;mac=AA:BB:CC:DD:EE:FF&amp;action=wake"</code>
                 </div>
                 <p class="trigger-tip">参数说明：<code>token</code> 必填；设备可用 <code>mac</code> 或 <code>device_id</code> 指定；<code>action</code> 为 <code>wake</code> 或 <code>shutdown</code></p>
-                <h4>Home Assistant 集成</h4>
-                <div class="code-block">
-                  <div class="code-label">configuration.yaml — REST 命令</div>
-                  <code><pre style="margin:0;white-space:pre;font-family:inherit;font-size:inherit">rest_command:
+                <n-collapse style="margin-top:12px">
+                  <n-collapse-item title="Home Assistant 集成示例" name="ha">
+                    <div class="code-block">
+                      <div class="code-label">configuration.yaml — REST 命令</div>
+                      <code><pre style="margin:0;white-space:pre;font-family:inherit;font-size:inherit">rest_command:
   wol_xyz_wake:
     url: "http://&lt;WOL_XYZ_IP&gt;:39090/api/external/trigger"
     method: GET
@@ -104,10 +105,10 @@ const activeTab = ref('quickstart')
       token: "YOUR_TOKEN"
       mac: "AA:BB:CC:DD:EE:FF"
       action: "shutdown"</pre></code>
-                </div>
-                <div class="code-block">
-                  <div class="code-label">自动化示例 — 回家自动开机</div>
-                  <code><pre style="margin:0;white-space:pre;font-family:inherit;font-size:inherit">automation:
+                    </div>
+                    <div class="code-block">
+                      <div class="code-label">自动化示例 — 回家自动开机</div>
+                      <code><pre style="margin:0;white-space:pre;font-family:inherit;font-size:inherit">automation:
   - alias: "回家自动开机"
     trigger:
       - platform: zone
@@ -116,8 +117,10 @@ const activeTab = ref('quickstart')
         event: enter
     action:
       - service: rest_command.wol_xyz_wake</pre></code>
-                </div>
-                <p class="trigger-tip">在 HA 中重启或执行「重新加载 REST 命令」后即可使用。也可通过 Shell Command 集成调用 curl 命令。</p>
+                    </div>
+                    <p class="trigger-tip">在 HA 中重启或执行「重新加载 REST 命令」后即可使用。也可通过 Shell Command 集成调用 curl 命令。</p>
+                  </n-collapse-item>
+                </n-collapse>
               </n-collapse-item>
 
               <n-collapse-item title="巴法云 (Bemfa)" name="bemfa">

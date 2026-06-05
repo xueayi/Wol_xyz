@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,27 +8,40 @@ from ..models.device import Device
 
 router = APIRouter(prefix="/api/scan", tags=["scan"], dependencies=[Depends(get_current_user)])
 
+_HOSTNAME_TYPE_RULES = [
+    ("ipad", "ipad"),
+    ("iphone", "iphone"),
+    ("apple-watch", "watch"),
+    ("watch", "watch"),
+    ("macbook", "macos"),
+    ("imac", "macos"),
+    ("mac-mini", "macos"),
+    ("mac-studio", "macos"),
+    ("android", "android"),
+    ("pixel", "android"),
+]
+
 
 @router.post("/start")
 async def start_scan(db: AsyncSession = Depends(get_db)):
     from ..services.scanner import scan_lan
-    from ..services.oui_detect import guess_device_type
-    devices = await scan_lan()
+
+    try:
+        devices = await scan_lan()
+    except RuntimeError as e:
+        if "scan_already_running" in str(e):
+            raise HTTPException(status_code=409, detail="扫描正在进行中，请稍候")
+        raise
+
     for d in devices:
-        oui_type = guess_device_type(d["mac"])
+        d["guessed_type"] = "computer"
         hostname = d.get("hostname", "").lower()
         if hostname:
-            if "ipad" in hostname:
-                oui_type = "ipad"
-            elif "iphone" in hostname:
-                oui_type = "iphone"
-            elif "watch" in hostname or "apple-watch" in hostname:
-                oui_type = "watch"
-            elif "macbook" in hostname or "imac" in hostname or "mac-mini" in hostname or "mac-studio" in hostname:
-                oui_type = "macos"
-            elif "android" in hostname or "pixel" in hostname:
-                oui_type = "android"
-        d["guessed_type"] = oui_type
+            for keyword, dtype in _HOSTNAME_TYPE_RULES:
+                if keyword in hostname:
+                    d["guessed_type"] = dtype
+                    break
+
     existing = (await db.execute(select(Device.mac))).scalars().all()
     existing_macs = [m.upper() for m in existing]
     return {"devices": devices, "existing_macs": existing_macs}

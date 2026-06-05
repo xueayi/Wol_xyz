@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin"
     PING_INTERVAL: int = 60
+    SCAN_SUBNET: str = ""
+    SCAN_TIMEOUT: int = 6
+    SCAN_ROUNDS: int = 3
+    SCAN_HOSTNAME_CONCURRENCY: int = 20
+    SCAN_HOSTNAME_TIMEOUT: int = 3
     FERNET_KEY: str = ""
     TZ: str = "Asia/Shanghai"
 

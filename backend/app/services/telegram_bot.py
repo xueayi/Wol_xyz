@@ -210,14 +210,19 @@ class TelegramBot:
     async def _cmd_scan(self, chat_id: int):
         await self.send_message(chat_id, "🔍 正在扫描局域网，请稍候...")
         from .scanner import scan_lan
-        devices = await scan_lan()
+        try:
+            devices = await scan_lan()
+        except RuntimeError:
+            await self.send_message(chat_id, "⏳ 扫描正在进行中，请稍候再试。")
+            return
         if not devices:
             await self.send_message(chat_id, "未发现设备。")
             return
 
         lines = [f"<b>🔍 扫描结果（{len(devices)} 台设备）</b>\n"]
         for d in devices:
-            lines.append(f"• {d['ip']}  <code>{d['mac']}</code>")
+            name = d.get("hostname") or "未知"
+            lines.append(f"• {d['ip']}  <code>{d['mac']}</code>  {name}")
         await self.send_message(chat_id, "\n".join(lines))
 
     async def _cmd_unknown(self, chat_id: int):
@@ -305,11 +310,19 @@ async def _bot_loop(trigger_id: int, config: dict):
     offset = 0
     logger.info("Telegram bot started for trigger %d", trigger_id)
 
+    backoff = 5
+    fail_count = 0
+    ever_connected = False
     try:
         while True:
             try:
                 updates = await bot.get_updates(offset=offset)
+                if not ever_connected:
+                    ever_connected = True
+                    logger.info("Telegram trigger %d connected", trigger_id)
                 _status[trigger_id] = "connected"
+                backoff = 5
+                fail_count = 0
                 for upd in updates:
                     offset = upd["update_id"] + 1
                     try:
@@ -319,10 +332,16 @@ async def _bot_loop(trigger_id: int, config: dict):
             except asyncio.CancelledError:
                 raise
             except Exception as e:
+                fail_count += 1
                 _status[trigger_id] = "disconnected"
-                logger.error("Telegram poll error: %s", e)
+                if fail_count == 1:
+                    log = logger.error if ever_connected else logger.warning
+                    log("Telegram trigger %d poll error: %s", trigger_id, e)
+                elif fail_count == 2:
+                    logger.warning("Telegram trigger %d still failing, retrying every %ds", trigger_id, backoff)
                 _status[trigger_id] = "connecting"
-                await asyncio.sleep(5)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 300)
     finally:
         _status.pop(trigger_id, None)
         await bot.close()

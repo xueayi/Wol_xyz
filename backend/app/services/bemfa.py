@@ -39,6 +39,18 @@ async def _bemfa_loop(trigger_id: int, config: dict):
     topic = config.get("topic", "")
     device_mac = config.get("device_mac", "")
 
+    backoff = 5
+    fail_count = 0
+
+    def _fail(msg: str):
+        nonlocal fail_count, backoff
+        fail_count += 1
+        if fail_count == 1:
+            logger.warning("Bemfa trigger %d %s", trigger_id, msg)
+        elif fail_count == 2:
+            logger.warning("Bemfa trigger %d still failing, retrying every %ds", trigger_id, backoff)
+        _status[trigger_id] = "disconnected"
+
     while True:
         reader = writer = None
         try:
@@ -46,38 +58,39 @@ async def _bemfa_loop(trigger_id: int, config: dict):
             sub = f"cmd=1&uid={uid}&topic={topic}\r\n"
             writer.write(sub.encode())
             await writer.drain()
-            logger.info("Bemfa trigger %d subscribing to %s ...", trigger_id, topic)
+            if fail_count == 0:
+                logger.info("Bemfa trigger %d subscribing to %s ...", trigger_id, topic)
 
-            # Wait for server ACK before marking connected.
-            # Bemfa returns "cmd=0" on success; invalid UID closes connection or times out.
             try:
                 ack = await asyncio.wait_for(reader.read(1024), timeout=10)
             except asyncio.TimeoutError:
-                logger.warning("Bemfa trigger %d handshake timeout (uid may be invalid)", trigger_id)
-                _status[trigger_id] = "disconnected"
+                _fail("handshake timeout (uid may be invalid)")
                 if writer:
                     writer.close()
-                await asyncio.sleep(5)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 300)
                 continue
 
             if not ack:
-                logger.warning("Bemfa trigger %d connection closed during handshake", trigger_id)
-                _status[trigger_id] = "disconnected"
+                _fail("connection closed during handshake")
                 if writer:
                     writer.close()
-                await asyncio.sleep(5)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 300)
                 continue
 
             ack_msg = ack.decode("utf-8", errors="ignore").strip()
             if "cmd=0" not in ack_msg:
-                logger.warning("Bemfa trigger %d handshake failed: %s", trigger_id, ack_msg)
-                _status[trigger_id] = "disconnected"
+                _fail(f"handshake failed: {ack_msg}")
                 if writer:
                     writer.close()
-                await asyncio.sleep(10)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 300)
                 continue
 
             _status[trigger_id] = "connected"
+            backoff = 5
+            fail_count = 0
             logger.info("Bemfa trigger %d connected, subscribed to %s", trigger_id, topic)
 
             ping_task = asyncio.create_task(_heartbeat(writer))
@@ -98,13 +111,13 @@ async def _bemfa_loop(trigger_id: int, config: dict):
             _status.pop(trigger_id, None)
             break
         except Exception as e:
-            _status[trigger_id] = "disconnected"
-            logger.error("Bemfa trigger %d error: %s", trigger_id, e)
+            _fail(f"error: {e}")
 
         if writer:
             writer.close()
         _status[trigger_id] = "connecting"
-        await asyncio.sleep(5)
+        await asyncio.sleep(backoff)
+        backoff = min(backoff * 2, 300)
 
 
 async def _heartbeat(writer: asyncio.StreamWriter):
