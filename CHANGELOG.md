@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.3] - 2026-06-05
+
+### Added
+
+- Home Assistant 集成示例：README 和应用内使用指引新增 `rest_command` 配置及自动化 YAML 示例
+
+### Fixed
+
+- 巴法云触发源握手验证：发送订阅报文后等待服务端 ACK（`cmd=0`）再标记为在线，UID 无效时不再错误显示「在线」状态
+
+### Changed
+
+- 应用图标更新为渐变色 SVG 图标
+
 ## [0.3.2] - 2026-06-05
 
 ### Added

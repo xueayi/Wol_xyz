@@ -175,7 +175,44 @@ curl "http://<IP>:39090/api/external/trigger?token=YOUR_TOKEN&mac=AA:BB:CC:DD:EE
 curl -X POST "http://<IP>:39090/api/external/trigger?token=YOUR_TOKEN&device_id=1&action=shutdown"
 ```
 
-也可通过 Home Assistant 的 REST 命令或 Shell Command 集成调用此 API 控制设备。
+#### Home Assistant 集成示例
+
+在 Home Assistant 的 `configuration.yaml` 中添加：
+
+```yaml
+# REST 命令方式
+rest_command:
+  wol_xyz_wake:
+    url: "http://<WOL_XYZ_IP>:39090/api/external/trigger"
+    method: GET
+    params:
+      token: "YOUR_TOKEN"
+      mac: "AA:BB:CC:DD:EE:FF"
+      action: "wake"
+  wol_xyz_shutdown:
+    url: "http://<WOL_XYZ_IP>:39090/api/external/trigger"
+    method: GET
+    params:
+      token: "YOUR_TOKEN"
+      mac: "AA:BB:CC:DD:EE:FF"
+      action: "shutdown"
+```
+
+在自动化中使用：
+
+```yaml
+automation:
+  - alias: "回家自动开机"
+    trigger:
+      - platform: zone
+        entity_id: person.me
+        zone: zone.home
+        event: enter
+    action:
+      - service: rest_command.wol_xyz_wake
+```
+
+> **提示**：也可通过 Shell Command 集成调用 curl 命令，适用于更复杂的场景。
 
 ### 巴法云
 

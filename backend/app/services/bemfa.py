@@ -46,6 +46,37 @@ async def _bemfa_loop(trigger_id: int, config: dict):
             sub = f"cmd=1&uid={uid}&topic={topic}\r\n"
             writer.write(sub.encode())
             await writer.drain()
+            logger.info("Bemfa trigger %d subscribing to %s ...", trigger_id, topic)
+
+            # Wait for server ACK before marking connected.
+            # Bemfa returns "cmd=0" on success; invalid UID closes connection or times out.
+            try:
+                ack = await asyncio.wait_for(reader.read(1024), timeout=10)
+            except asyncio.TimeoutError:
+                logger.warning("Bemfa trigger %d handshake timeout (uid may be invalid)", trigger_id)
+                _status[trigger_id] = "disconnected"
+                if writer:
+                    writer.close()
+                await asyncio.sleep(5)
+                continue
+
+            if not ack:
+                logger.warning("Bemfa trigger %d connection closed during handshake", trigger_id)
+                _status[trigger_id] = "disconnected"
+                if writer:
+                    writer.close()
+                await asyncio.sleep(5)
+                continue
+
+            ack_msg = ack.decode("utf-8", errors="ignore").strip()
+            if "cmd=0" not in ack_msg:
+                logger.warning("Bemfa trigger %d handshake failed: %s", trigger_id, ack_msg)
+                _status[trigger_id] = "disconnected"
+                if writer:
+                    writer.close()
+                await asyncio.sleep(10)
+                continue
+
             _status[trigger_id] = "connected"
             logger.info("Bemfa trigger %d connected, subscribed to %s", trigger_id, topic)
 
