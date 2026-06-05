@@ -44,6 +44,8 @@ class DeviceOut(BaseModel):
     shutdown_enabled: bool
     shutdown_user: str
     shutdown_auth_type: str
+    has_password: bool = False
+    has_private_key: bool = False
     is_online: bool
     last_seen_at: Optional[datetime]
     created_at: datetime

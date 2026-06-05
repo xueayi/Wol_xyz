@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useMessage } from 'naive-ui'
-import { createDevice, updateDevice, deleteDevice } from '../../api/devices'
+import { createDevice, updateDevice, deleteDevice, generateKeypair } from '../../api/devices'
 import { getGroups } from '../../api/groups'
 
 const props = defineProps<{ show: boolean; device?: any }>()
-const emit = defineEmits(['update:show', 'saved'])
+const emit = defineEmits(['update:show', 'saved', 'open-guide'])
 const msg = useMessage()
 
 const form = ref<any>({})
 const groups = ref<any[]>([])
 const saving = ref(false)
 const isEdit = ref(false)
+const generatingKey = ref(false)
+const showPublicKey = ref(false)
+const generatedPublicKey = ref('')
 
 const deviceTypeOptions = [
   { label: 'Windows', value: 'windows' },
@@ -36,13 +39,23 @@ const authTypeOptions = [
   { label: '密钥', value: 'key' },
 ]
 
+const hasExistingPassword = computed(() => isEdit.value && props.device?.has_password)
+const hasExistingKey = computed(() => isEdit.value && props.device?.has_private_key)
+
+function resetForm() {
+  showPublicKey.value = false
+  generatedPublicKey.value = ''
+}
+
 watch(() => props.show, async (v) => {
-  if (!v) return
+  if (!v) { resetForm(); return }
   const { data } = await getGroups()
   groups.value = data
   if (props.device) {
     isEdit.value = true
     form.value = { ...props.device }
+    form.value.shutdown_password = ''
+    form.value.shutdown_private_key = ''
   } else {
     isEdit.value = false
     form.value = { name: '', ip: '', mac: '', adapter_name: '', device_type: 'computer', group_id: null, shutdown_enabled: false, shutdown_user: '', shutdown_password: '', shutdown_auth_type: 'password', shutdown_private_key: '' }
@@ -62,11 +75,14 @@ async function handleSave() {
   }
   saving.value = true
   try {
+    const payload = { ...form.value }
+    if (isEdit.value && !payload.shutdown_password) delete payload.shutdown_password
+    if (isEdit.value && !payload.shutdown_private_key) delete payload.shutdown_private_key
     if (isEdit.value) {
-      await updateDevice(form.value.id, form.value)
+      await updateDevice(form.value.id, payload)
       msg.success('设备已更新')
     } else {
-      await createDevice(form.value)
+      await createDevice(payload)
       msg.success('设备已添加')
     }
     emit('saved')
@@ -84,6 +100,25 @@ async function handleDelete() {
     emit('saved')
     emit('update:show', false)
   } catch { msg.error('删除失败') }
+}
+
+async function handleGenerateKey() {
+  generatingKey.value = true
+  try {
+    const { data } = await generateKeypair()
+    form.value.shutdown_private_key = data.private_key
+    generatedPublicKey.value = data.public_key
+    showPublicKey.value = true
+    msg.success('密钥对已生成，私钥已自动填入')
+  } catch { msg.error('生成密钥对失败') }
+  finally { generatingKey.value = false }
+}
+
+async function copyPublicKey() {
+  try {
+    await navigator.clipboard.writeText(generatedPublicKey.value)
+    msg.success('公钥已复制到剪贴板')
+  } catch { msg.error('复制失败') }
 }
 
 const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value: g.id }))
@@ -105,22 +140,45 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
       </n-form-item>
       <n-divider />
       <n-form-item label="远程关机">
-        <n-switch v-model:value="form.shutdown_enabled" :disabled="!canShutdown" />
-        <span v-if="!canShutdown" style="margin-left:8px;font-size:12px;color:var(--n-text-color-3)">仅 Windows / Linux / macOS 设备支持</span>
+        <div style="display:flex;align-items:center;gap:8px;width:100%">
+          <n-switch v-model:value="form.shutdown_enabled" :disabled="!canShutdown" />
+          <span v-if="!canShutdown" style="font-size:12px;color:var(--n-text-color-3)">仅 Windows / Linux / macOS 设备支持</span>
+          <span v-else-if="!form.shutdown_enabled" class="guide-link" @click="emit('open-guide', 'wol')">配置说明</span>
+        </div>
       </n-form-item>
       <template v-if="form.shutdown_enabled">
-        <n-form-item label="SSH 用户名"><n-input v-model:value="form.shutdown_user" /></n-form-item>
+        <n-form-item label="SSH 用户名">
+          <n-input v-model:value="form.shutdown_user" placeholder="目标设备的登录用户名" style="flex:1" />
+        </n-form-item>
         <n-form-item label="认证方式">
           <n-radio-group v-model:value="form.shutdown_auth_type">
             <n-radio-button v-for="o in authTypeOptions" :key="o.value" :value="o.value" :label="o.label" />
           </n-radio-group>
         </n-form-item>
         <n-form-item v-if="form.shutdown_auth_type === 'password'" label="SSH 密码">
-          <n-input v-model:value="form.shutdown_password" type="password" show-password-on="click" />
+          <n-input v-model:value="form.shutdown_password" type="password" show-password-on="click"
+            :placeholder="hasExistingPassword ? '已配置，留空保持不变' : '输入 SSH 密码'" />
         </n-form-item>
-        <n-form-item v-if="form.shutdown_auth_type === 'key'" label="SSH 私钥">
-          <n-input v-model:value="form.shutdown_private_key" type="textarea" :rows="4" placeholder="粘贴 SSH 私钥内容（PEM 格式）" />
-        </n-form-item>
+        <template v-if="form.shutdown_auth_type === 'key'">
+          <n-form-item label="SSH 私钥">
+            <div style="width:100%">
+              <n-input v-model:value="form.shutdown_private_key" type="textarea" :rows="4"
+                :placeholder="hasExistingKey ? '已配置，留空保持不变。也可粘贴新私钥或点击下方生成' : '粘贴 PEM 格式私钥，或点击下方按钮一键生成'" />
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <n-button size="small" :loading="generatingKey" @click="handleGenerateKey">
+                  生成密钥对
+                </n-button>
+              </div>
+            </div>
+          </n-form-item>
+          <div v-if="showPublicKey" class="pubkey-box">
+            <div class="pubkey-header">
+              <span class="pubkey-label">公钥（需添加到目标设备）</span>
+              <n-button size="tiny" quaternary type="primary" @click="copyPublicKey">复制</n-button>
+            </div>
+            <code class="pubkey-text">{{ generatedPublicKey }}</code>
+          </div>
+        </template>
       </template>
     </n-form>
     <template #action>
@@ -133,3 +191,39 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
     </template>
   </n-modal>
 </template>
+
+<style scoped>
+.guide-link {
+  font-size: 12px;
+  color: #007AFF;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.guide-link:hover { text-decoration: underline; }
+.pubkey-box {
+  background: rgba(0, 122, 255, 0.04);
+  border: 1px solid rgba(0, 122, 255, 0.15);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: -8px 0 8px 80px;
+}
+.pubkey-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.pubkey-label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+.pubkey-text {
+  font-size: 11px;
+  word-break: break-all;
+  color: #1c1c1e;
+  font-family: 'SF Mono', SFMono-Regular, Menlo, monospace;
+  line-height: 1.5;
+  display: block;
+}
+</style>

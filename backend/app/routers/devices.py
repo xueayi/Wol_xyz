@@ -105,6 +105,25 @@ async def shutdown_device(device_id: int, db: AsyncSession = Depends(get_db)):
     return {"success": success, "detail": detail}
 
 
+@router.post("/generate-keypair")
+async def generate_keypair(user: User = Depends(get_current_user)):
+    """Generate an Ed25519 SSH key pair and return both keys."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives import serialization
+
+    private_key = Ed25519PrivateKey.generate()
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.OpenSSH,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode()
+    public_key = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.OpenSSH,
+        format=serialization.PublicFormat.OpenSSH,
+    ).decode()
+    return {"private_key": private_pem, "public_key": public_key + " wol_xyz"}
+
+
 @router.post("/batch-delete", status_code=200)
 async def batch_delete_devices(body: BatchDeleteRequest, db: AsyncSession = Depends(get_db)):
     if not body.ids:

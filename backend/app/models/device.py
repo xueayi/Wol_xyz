@@ -27,3 +27,11 @@ class Device(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=tz_now, onupdate=tz_now)
 
     group: Mapped[Optional["DeviceGroup"]] = relationship(back_populates="devices")  # noqa: F821
+
+    @property
+    def has_password(self) -> bool:
+        return bool(self.shutdown_password_enc)
+
+    @property
+    def has_private_key(self) -> bool:
+        return bool(self.shutdown_key_enc)

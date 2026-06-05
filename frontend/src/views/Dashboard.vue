@@ -47,6 +47,7 @@ const showInfoModal = ref(false)
 const showGuideModal = ref(false)
 const showTriggerModal = ref(false)
 const showUserModal = ref(false)
+const guideInitialTab = ref('quickstart')
 const infoTitle = ref('')
 const infoContent = ref('')
 
@@ -120,6 +121,11 @@ function handleAction(key: string) {
 function handleEditDevice(device: any) {
   editingDevice.value = device
   showDeviceModal.value = true
+}
+
+function handleOpenGuide(tab: string) {
+  guideInitialTab.value = tab || 'wol'
+  showGuideModal.value = true
 }
 
 async function refresh() {
@@ -296,14 +302,14 @@ onUnmounted(() => { ws?.close() })
       </div>
     </div>
 
-    <DeviceModal v-model:show="showDeviceModal" :device="editingDevice" @saved="refresh" />
+    <DeviceModal v-model:show="showDeviceModal" :device="editingDevice" @saved="refresh" @open-guide="handleOpenGuide" />
     <ScanModal v-model:show="showScanModal" @saved="refresh" />
     <ScheduleModal v-model:show="showScheduleModal" @saved="refresh" />
     <ChannelModal v-model:show="showChannelModal" @saved="refresh" />
     <LogsModal v-model:show="showLogsModal" />
     <GroupModal v-model:show="showGroupModal" @saved="refresh" />
     <InfoModal v-model:show="showInfoModal" :title="infoTitle" :content="infoContent" />
-    <GuideModal v-model:show="showGuideModal" />
+    <GuideModal v-model:show="showGuideModal" :initial-tab="guideInitialTab" />
     <TriggerModal v-model:show="showTriggerModal" @saved="refresh" />
     <UserModal v-model:show="showUserModal" />
 

@@ -29,10 +29,11 @@ async def send_shutdown(
         env = os.environ.copy()
 
         if private_key:
+            key_text = private_key.strip() + "\n"
             tmp = tempfile.NamedTemporaryFile(
                 mode="w", suffix="_key", delete=False, prefix="wol_ssh_"
             )
-            tmp.write(private_key)
+            tmp.write(key_text)
             tmp.close()
             key_path = tmp.name
             os.chmod(key_path, 0o600)

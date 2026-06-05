@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
-defineProps<{ show: boolean }>()
+const props = defineProps<{ show: boolean; initialTab?: string }>()
 const emit = defineEmits(['update:show'])
 
 const activeTab = ref('quickstart')
+
+watch(() => props.show, (v) => {
+  if (v && props.initialTab) activeTab.value = props.initialTab
+})
 </script>
 
 <template>
@@ -52,12 +56,74 @@ const activeTab = ref('quickstart')
             <n-divider />
 
             <h3>远程关机 (SSH)</h3>
-            <ol>
-              <li><b>Windows</b>：设置 → 应用 → 可选功能 → 添加 OpenSSH Server</li>
-              <li><b>Linux / macOS</b>：通常自带 SSH，确保 sshd 已启用</li>
-              <li>确保 SSH 端口 22 未被防火墙阻止</li>
-              <li>在设备设置中启用远程关机并填写 SSH 凭据</li>
-            </ol>
+            <p class="trigger-desc">通过 SSH 连接目标设备执行关机命令，支持密码和密钥对两种认证方式。</p>
+
+            <n-collapse>
+              <n-collapse-item title="1. 确保目标设备已开启 SSH" name="ssh-enable">
+                <h4>Windows</h4>
+                <ol>
+                  <li>设置 → 应用 → 可选功能 → 添加功能 → <b>OpenSSH 服务器</b></li>
+                  <li>打开「服务」(services.msc)，找到 <b>OpenSSH SSH Server</b>，设为「自动」并启动</li>
+                </ol>
+                <h4>Linux</h4>
+                <div class="code-block"><code>sudo systemctl enable --now sshd</code></div>
+                <h4>macOS</h4>
+                <ol><li>系统设置 → 通用 → 共享 → 开启「远程登录」</li></ol>
+                <p class="trigger-tip">确保防火墙放行 SSH 端口（默认 22）</p>
+              </n-collapse-item>
+
+              <n-collapse-item title="2. 获取 SSH 用户名" name="ssh-user">
+                <h4>用户名是什么？</h4>
+                <p>SSH 用户名就是你登录目标电脑时用的账号名，而非 Wol_xyz 的登录账号。</p>
+                <h4>如何查看</h4>
+                <div class="code-block">
+                  <div class="code-label">Windows（CMD / PowerShell）</div>
+                  <code>echo %USERNAME%</code>
+                </div>
+                <div class="code-block">
+                  <div class="code-label">Linux / macOS（终端）</div>
+                  <code>whoami</code>
+                </div>
+                <p class="trigger-tip">关机命令需要管理员/sudo 权限。Linux 可使用 root 用户，或为普通用户配置免密 sudo</p>
+              </n-collapse-item>
+
+              <n-collapse-item title="3. 配置认证方式" name="ssh-auth">
+                <h4>方式一：密码认证</h4>
+                <ol>
+                  <li>在设备编辑中选择「密码」认证方式</li>
+                  <li>填写目标设备的 SSH 登录密码</li>
+                </ol>
+                <p class="trigger-tip">密码使用 Fernet 对称加密存储，但密码认证要求服务器安装 <code>sshpass</code></p>
+
+                <h4 style="margin-top:16px">方式二：密钥对认证（推荐）</h4>
+                <ol>
+                  <li>在设备编辑中选择「密钥」认证方式</li>
+                  <li>点击「<b>生成密钥对</b>」按钮，系统自动生成 Ed25519 密钥对</li>
+                  <li>私钥会自动填入表单，<b>复制公钥</b></li>
+                  <li>在目标设备上将公钥添加到 <code>~/.ssh/authorized_keys</code>：</li>
+                </ol>
+                <div class="code-block">
+                  <div class="code-label">Linux / macOS</div>
+                  <code>mkdir -p ~/.ssh &amp;&amp; echo "公钥内容" >> ~/.ssh/authorized_keys &amp;&amp; chmod 600 ~/.ssh/authorized_keys</code>
+                </div>
+                <div class="code-block">
+                  <div class="code-label">Windows（管理员 PowerShell）</div>
+                  <code><pre style="margin:0;white-space:pre;font-family:inherit;font-size:inherit">$key = "公钥内容"
+$path = "$env:USERPROFILE\.ssh\authorized_keys"
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.ssh"
+Add-Content $path $key</pre></code>
+                </div>
+                <p class="trigger-tip">也可以手动粘贴已有的 PEM 格式私钥（如 <code>id_ed25519</code>、<code>id_rsa</code>），无需使用生成功能</p>
+              </n-collapse-item>
+
+              <n-collapse-item title="4. Linux 免密 sudo 关机" name="ssh-sudo">
+                <p>非 root 用户执行关机需要 sudo 权限，可配置免密 sudo：</p>
+                <div class="code-block">
+                  <div class="code-label">编辑 sudoers（在目标设备上）</div>
+                  <code>echo "你的用户名 ALL=(ALL) NOPASSWD: /sbin/shutdown" | sudo tee /etc/sudoers.d/wol_shutdown</code>
+                </div>
+              </n-collapse-item>
+            </n-collapse>
           </div>
         </n-tab-pane>
 
