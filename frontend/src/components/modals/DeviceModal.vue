@@ -76,6 +76,12 @@ async function handleSave() {
   saving.value = true
   try {
     const payload = { ...form.value }
+    delete payload.has_password
+    delete payload.has_private_key
+    delete payload.is_online
+    delete payload.last_seen_at
+    delete payload.created_at
+    delete payload.updated_at
     if (isEdit.value && !payload.shutdown_password) delete payload.shutdown_password
     if (isEdit.value && !payload.shutdown_private_key) delete payload.shutdown_private_key
     if (isEdit.value) {
@@ -127,7 +133,7 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
 <template>
   <n-modal :show="show" @update:show="emit('update:show', $event)" preset="card"
     :title="isEdit ? '编辑设备' : '添加设备'" style="width: 500px" :bordered="false">
-    <n-form label-placement="left" label-width="80">
+    <n-form label-placement="left" label-width="90" class="device-form">
       <n-form-item label="名称"><n-input v-model:value="form.name" /></n-form-item>
       <n-form-item label="IP 地址"><n-input v-model:value="form.ip" placeholder="192.168.1.100" /></n-form-item>
       <n-form-item label="MAC 地址"><n-input v-model:value="form.mac" placeholder="AA:BB:CC:DD:EE:FF" /></n-form-item>
@@ -143,10 +149,16 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
         <div style="display:flex;align-items:center;gap:8px;width:100%">
           <n-switch v-model:value="form.shutdown_enabled" :disabled="!canShutdown" />
           <span v-if="!canShutdown" style="font-size:12px;color:var(--n-text-color-3)">仅 Windows / Linux / macOS 设备支持</span>
-          <span v-else-if="!form.shutdown_enabled" class="guide-link" @click="emit('open-guide', 'wol')">配置说明</span>
         </div>
       </n-form-item>
       <template v-if="form.shutdown_enabled">
+        <div class="shutdown-guide-inline">
+          <n-alert type="info" :show-icon="false" style="font-size:13px">
+            <b>配置步骤：</b>① 确保目标设备已开启 SSH → ② 填写用户名和认证凭据 → ③ 保存后测试关机
+            <br/>
+            <span class="guide-link" @click="emit('open-guide', 'wol')">查看详细配置说明</span>
+          </n-alert>
+        </div>
         <n-form-item label="SSH 用户名">
           <n-input v-model:value="form.shutdown_user" placeholder="目标设备的登录用户名" style="flex:1" />
         </n-form-item>
@@ -164,19 +176,24 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
             <div style="width:100%">
               <n-input v-model:value="form.shutdown_private_key" type="textarea" :rows="4"
                 :placeholder="hasExistingKey ? '已配置，留空保持不变。也可粘贴新私钥或点击下方生成' : '粘贴 PEM 格式私钥，或点击下方按钮一键生成'" />
-              <div style="display:flex;gap:8px;margin-top:8px">
+              <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
                 <n-button size="small" :loading="generatingKey" @click="handleGenerateKey">
                   生成密钥对
                 </n-button>
+                <span style="font-size:11px;color:#999">生成后需将公钥部署到目标设备才能认证</span>
               </div>
             </div>
           </n-form-item>
           <div v-if="showPublicKey" class="pubkey-box">
             <div class="pubkey-header">
-              <span class="pubkey-label">公钥（需添加到目标设备）</span>
+              <span class="pubkey-label">公钥（复制后添加到目标设备的 authorized_keys）</span>
               <n-button size="tiny" quaternary type="primary" @click="copyPublicKey">复制</n-button>
             </div>
             <code class="pubkey-text">{{ generatedPublicKey }}</code>
+            <p class="pubkey-hint">
+              Linux/macOS: <code>echo "公钥" >> ~/.ssh/authorized_keys</code><br/>
+              Windows: 添加到 <code>%USERPROFILE%\.ssh\authorized_keys</code>
+            </p>
           </div>
         </template>
       </template>
@@ -193,6 +210,9 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
 </template>
 
 <style scoped>
+.device-form :deep(.n-form-item-label) {
+  white-space: nowrap;
+}
 .guide-link {
   font-size: 12px;
   color: #007AFF;
@@ -205,7 +225,7 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
   border: 1px solid rgba(0, 122, 255, 0.15);
   border-radius: 10px;
   padding: 10px 14px;
-  margin: -8px 0 8px 80px;
+  margin: -8px 0 8px 90px;
 }
 .pubkey-header {
   display: flex;
@@ -225,5 +245,20 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
   font-family: 'SF Mono', SFMono-Regular, Menlo, monospace;
   line-height: 1.5;
   display: block;
+}
+.pubkey-hint {
+  font-size: 11px;
+  color: #999;
+  margin: 6px 0 0;
+  line-height: 1.6;
+}
+.pubkey-hint code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+.shutdown-guide-inline {
+  margin: 0 0 12px;
 }
 </style>

@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.3] - 2026-06-06
+
+### Added
+
+- 远程关机内联引导：开启关机后显示配置步骤提示卡片和详细说明链接
+- 密钥对公钥区域增加部署命令提示（Linux/macOS/Windows）
+- 生成密钥对按钮旁增加「需将公钥部署到目标设备」提示
+
+### Fixed
+
+- SSH 用户名表单项排版两行：label-width 增至 90px 并强制 label 不换行
+- 私钥缺少 PEM 头尾标记时自动补全，防止 `error in libcrypto` 报错
+- 编辑设备时 payload 清除 DeviceOut 只读字段，避免请求携带无效属性
+
 ## [1.0.2] - 2026-06-06
 
 ### Added

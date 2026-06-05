@@ -29,7 +29,15 @@ async def send_shutdown(
         env = os.environ.copy()
 
         if private_key:
-            key_text = private_key.strip() + "\n"
+            pk = private_key.strip()
+            if "-----BEGIN" not in pk:
+                logger.warning("私钥缺少 PEM 头尾标记，尝试自动补全")
+                pk = (
+                    "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+                    + pk + "\n"
+                    + "-----END OPENSSH PRIVATE KEY-----"
+                )
+            key_text = pk + "\n"
             tmp = tempfile.NamedTemporaryFile(
                 mode="w", suffix="_key", delete=False, prefix="wol_ssh_"
             )
