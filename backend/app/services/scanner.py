@@ -36,7 +36,28 @@ def _get_local_ip() -> Optional[str]:
                         if _is_private_ip(ip):
                             return ip
         elif system == "Linux":
-            result = subprocess.run(
+            ip = _linux_detect_lan_ip(subprocess)
+            if ip:
+                return ip
+    except Exception:
+        pass
+
+    # Method 2: UDP route probe (may return VPN/proxy IP)
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return None
+
+
+def _linux_detect_lan_ip(subprocess_mod) -> Optional[str]:
+    """Detect the LAN IP on Linux, trying ``ip`` then ``ifconfig``."""
+    if shutil.which("ip"):
+        try:
+            result = subprocess_mod.run(
                 ["ip", "-4", "-o", "addr", "show"],
                 capture_output=True, text=True, timeout=3,
             )
@@ -54,18 +75,31 @@ def _get_local_ip() -> Optional[str]:
                         ip = p.split("/")[0]
                         if _is_private_ip(ip):
                             return ip
-    except Exception:
-        pass
+        except Exception:
+            pass
 
-    # Method 2: UDP route probe (may return VPN/proxy IP)
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        return None
+    if shutil.which("ifconfig"):
+        try:
+            result = subprocess_mod.run(
+                ["ifconfig"], capture_output=True, text=True, timeout=3,
+            )
+            current_iface = ""
+            for line in result.stdout.splitlines():
+                if line and not line[0].isspace():
+                    current_iface = line.split(":")[0].split()[0]
+                if any(current_iface.startswith(p) for p in DOCKER_IFACE_PREFIXES):
+                    continue
+                if current_iface == "lo":
+                    continue
+                stripped = line.strip()
+                if stripped.startswith("inet ") and "127.0.0.1" not in stripped:
+                    ip = stripped.split()[1]
+                    if _is_private_ip(ip):
+                        return ip
+        except Exception:
+            pass
+
+    return None
 
 
 def _is_private_ip(ip: str) -> bool:
@@ -92,29 +126,61 @@ def _get_scan_network() -> Optional[ipaddress.IPv4Network]:
 def _get_docker_subnets() -> list[ipaddress.IPv4Network]:
     """Detect Docker bridge subnets by reading network interfaces."""
     subnets: list[ipaddress.IPv4Network] = []
-    try:
-        import subprocess
-        if platform.system() != "Linux":
-            return subnets
-        result = subprocess.run(
-            ["ip", "-4", "-o", "addr", "show"],
-            capture_output=True, text=True, timeout=3,
-        )
-        for line in result.stdout.splitlines():
-            parts = line.split()
-            if len(parts) < 4:
-                continue
-            iface = parts[1]
-            if any(iface.startswith(p) for p in DOCKER_IFACE_PREFIXES):
-                for p in parts:
-                    if "/" in p:
-                        try:
-                            net = ipaddress.ip_network(p, strict=False)
-                            subnets.append(net)
-                        except ValueError:
-                            pass
-    except Exception:
-        pass
+    if platform.system() != "Linux":
+        return subnets
+    import subprocess
+
+    if shutil.which("ip"):
+        try:
+            result = subprocess.run(
+                ["ip", "-4", "-o", "addr", "show"],
+                capture_output=True, text=True, timeout=3,
+            )
+            for line in result.stdout.splitlines():
+                parts = line.split()
+                if len(parts) < 4:
+                    continue
+                iface = parts[1]
+                if any(iface.startswith(p) for p in DOCKER_IFACE_PREFIXES):
+                    for p in parts:
+                        if "/" in p:
+                            try:
+                                net = ipaddress.ip_network(p, strict=False)
+                                subnets.append(net)
+                            except ValueError:
+                                pass
+            if subnets:
+                return subnets
+        except Exception:
+            pass
+
+    if shutil.which("ifconfig"):
+        try:
+            result = subprocess.run(
+                ["ifconfig"], capture_output=True, text=True, timeout=3,
+            )
+            current_iface = ""
+            for line in result.stdout.splitlines():
+                if line and not line[0].isspace():
+                    current_iface = line.split(":")[0].split()[0]
+                if not any(current_iface.startswith(p) for p in DOCKER_IFACE_PREFIXES):
+                    continue
+                stripped = line.strip()
+                m = re.match(r"inet (\d+\.\d+\.\d+\.\d+)\s+netmask\s+(\S+)", stripped)
+                if m:
+                    ip_str, mask_str = m.group(1), m.group(2)
+                    try:
+                        if mask_str.startswith("0x"):
+                            prefix = bin(int(mask_str, 16)).count("1")
+                        else:
+                            prefix = ipaddress.IPv4Network(f"0.0.0.0/{mask_str}").prefixlen
+                        net = ipaddress.ip_network(f"{ip_str}/{prefix}", strict=False)
+                        subnets.append(net)
+                    except (ValueError, TypeError):
+                        pass
+        except Exception:
+            pass
+
     return subnets
 
 
@@ -132,10 +198,10 @@ def _get_gateway() -> Optional[str]:
     import subprocess
     system = platform.system()
     try:
-        if system in ("Darwin", "Linux"):
+        if system == "Darwin":
             result = subprocess.run(
-                ["route", "-n", "get", "default"] if system == "Darwin" else ["ip", "route", "show", "default"],
-                capture_output=True, text=True, timeout=3
+                ["route", "-n", "get", "default"],
+                capture_output=True, text=True, timeout=3,
             )
             for line in result.stdout.splitlines():
                 if "gateway" in line:
@@ -146,12 +212,48 @@ def _get_gateway() -> Optional[str]:
                     gw = line.split(":")[-1].strip()
                     if gw:
                         return gw
+        elif system == "Linux":
+            gw = _linux_detect_gateway(subprocess)
+            if gw:
+                return gw
     except Exception:
         pass
     local_ip = _get_local_ip()
     if local_ip:
         parts = local_ip.split(".")
         return f"{parts[0]}.{parts[1]}.{parts[2]}.1"
+    return None
+
+
+def _linux_detect_gateway(subprocess_mod) -> Optional[str]:
+    """Detect default gateway on Linux, trying ``ip route`` then ``route -n``."""
+    if shutil.which("ip"):
+        try:
+            result = subprocess_mod.run(
+                ["ip", "route", "show", "default"],
+                capture_output=True, text=True, timeout=3,
+            )
+            for line in result.stdout.splitlines():
+                parts = line.split()
+                if "via" in parts:
+                    idx = parts.index("via") + 1
+                    if idx < len(parts):
+                        return parts[idx]
+        except Exception:
+            pass
+
+    if shutil.which("route"):
+        try:
+            result = subprocess_mod.run(
+                ["route", "-n"], capture_output=True, text=True, timeout=3,
+            )
+            for line in result.stdout.splitlines():
+                parts = line.split()
+                if len(parts) >= 3 and parts[0] == "0.0.0.0":
+                    return parts[1]
+        except Exception:
+            pass
+
     return None
 
 
@@ -234,19 +336,34 @@ async def _send_arp_broadcast(network: ipaddress.IPv4Network):
 def _get_primary_iface() -> Optional[str]:
     """Get the primary network interface name on Linux."""
     import subprocess
-    try:
-        result = subprocess.run(
-            ["ip", "route", "show", "default"],
-            capture_output=True, text=True, timeout=3,
-        )
-        for line in result.stdout.splitlines():
-            if "dev" in line:
+
+    if shutil.which("ip"):
+        try:
+            result = subprocess.run(
+                ["ip", "route", "show", "default"],
+                capture_output=True, text=True, timeout=3,
+            )
+            for line in result.stdout.splitlines():
+                if "dev" in line:
+                    parts = line.split()
+                    idx = parts.index("dev") + 1
+                    if idx < len(parts):
+                        return parts[idx]
+        except Exception:
+            pass
+
+    if shutil.which("route"):
+        try:
+            result = subprocess.run(
+                ["route", "-n"], capture_output=True, text=True, timeout=3,
+            )
+            for line in result.stdout.splitlines():
                 parts = line.split()
-                idx = parts.index("dev") + 1
-                if idx < len(parts):
-                    return parts[idx]
-    except Exception:
-        pass
+                if len(parts) >= 8 and parts[0] == "0.0.0.0":
+                    return parts[-1]
+        except Exception:
+            pass
+
     return None
 
 
@@ -255,7 +372,17 @@ def _get_primary_iface() -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 async def _read_arp_table() -> list[dict]:
-    """Parse arp -a output, returning list of {ip, mac}."""
+    """Read ARP table, returning list of {ip, mac}.
+
+    On Linux, reads /proc/net/arp directly (microsecond-level, no DNS
+    lookups) instead of shelling out to ``arp -a`` which does reverse DNS
+    for every entry and can take minutes when there are hundreds of
+    Docker bridge entries.  Only REACHABLE entries (flags & 0x2) with a
+    real MAC are included.
+    """
+    if platform.system() == "Linux":
+        return await _read_proc_net_arp()
+
     proc = await asyncio.create_subprocess_exec(
         "arp", "-a",
         stdout=asyncio.subprocess.PIPE,
@@ -281,6 +408,34 @@ async def _read_arp_table() -> list[dict]:
                 devices.append({"ip": ip_addr, "mac": mac})
 
     return devices
+
+
+async def _read_proc_net_arp() -> list[dict]:
+    """Parse /proc/net/arp directly — orders of magnitude faster than arp -a."""
+    loop = asyncio.get_event_loop()
+
+    def _parse():
+        devices = []
+        try:
+            with open("/proc/net/arp") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) < 6 or parts[0] == "IP":
+                        continue
+                    ip_addr = parts[0]
+                    flags = parts[2]
+                    mac_raw = parts[3]
+                    if flags != "0x2":
+                        continue
+                    mac = ":".join(p.zfill(2) for p in mac_raw.split(":")).upper()
+                    if mac in ("00:00:00:00:00:00", "FF:FF:FF:FF:FF:FF"):
+                        continue
+                    devices.append({"ip": ip_addr, "mac": mac})
+        except OSError:
+            pass
+        return devices
+
+    return await loop.run_in_executor(None, _parse)
 
 
 async def _adaptive_arp_wait(network: ipaddress.IPv4Network, timeout: int) -> list[dict]:

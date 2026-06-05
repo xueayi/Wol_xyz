@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2026-06-06
+
+### Fixed
+
+- Docker 容器内扫描极慢且不稳定：Linux 下改用 `/proc/net/arp` 直读内核 ARP 表（0.7ms vs `arp -a` 反查 DNS 超时），过滤 incomplete 条目
+- 容器缺少 `ip` 命令导致 IP 检测、Docker 子网过滤、ARP 广播、网关检测全部静默失败：所有网络工具调用增加 `ifconfig`/`route -n` 降级方案
+- Docker 环境下扫描设备数从 1~11 不稳定提升到 14 台稳定，耗时从 12~36s 降至 ~7s
+
 ## [1.0.0] - 2026-06-06
 
 ### Changed
