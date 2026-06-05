@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +10,7 @@ from ..models.schedule import ScheduledTask
 from ..models.log import OperationLog
 from ..schemas.dashboard import DashboardStats
 from ..config import APP_VERSION
+from ..tz import tz_now
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"], dependencies=[Depends(get_current_user)])
 
@@ -22,7 +22,7 @@ async def stats(db: AsyncSession = Depends(get_db)):
     groups = (await db.execute(select(func.count()).select_from(DeviceGroup))).scalar()
     schedules = (await db.execute(select(func.count()).select_from(ScheduledTask))).scalar()
 
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = tz_now().replace(hour=0, minute=0, second=0, microsecond=0)
     today_triggers = (await db.execute(
         select(func.count()).select_from(OperationLog).where(OperationLog.created_at >= today_start)
     )).scalar()

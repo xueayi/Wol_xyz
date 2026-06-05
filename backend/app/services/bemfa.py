@@ -9,6 +9,11 @@ from ..models.device import Device
 logger = logging.getLogger(__name__)
 
 _tasks: dict[int, asyncio.Task] = {}
+_status: dict[int, str] = {}
+
+
+def get_status() -> dict[int, str]:
+    return dict(_status)
 
 
 async def start_bemfa_clients():
@@ -23,6 +28,7 @@ async def start_bemfa_clients():
 def _start_one(trigger_id: int, config: dict):
     if trigger_id in _tasks and not _tasks[trigger_id].done():
         _tasks[trigger_id].cancel()
+    _status[trigger_id] = "connecting"
     _tasks[trigger_id] = asyncio.create_task(_bemfa_loop(trigger_id, config))
 
 
@@ -40,6 +46,7 @@ async def _bemfa_loop(trigger_id: int, config: dict):
             sub = f"cmd=1&uid={uid}&topic={topic}\r\n"
             writer.write(sub.encode())
             await writer.drain()
+            _status[trigger_id] = "connected"
             logger.info("Bemfa trigger %d connected, subscribed to %s", trigger_id, topic)
 
             ping_task = asyncio.create_task(_heartbeat(writer))
@@ -57,12 +64,15 @@ async def _bemfa_loop(trigger_id: int, config: dict):
                 ping_task.cancel()
 
         except asyncio.CancelledError:
+            _status.pop(trigger_id, None)
             break
         except Exception as e:
+            _status[trigger_id] = "disconnected"
             logger.error("Bemfa trigger %d error: %s", trigger_id, e)
 
         if writer:
             writer.close()
+        _status[trigger_id] = "connecting"
         await asyncio.sleep(5)
 
 
@@ -124,3 +134,4 @@ def stop_all():
     for t in _tasks.values():
         t.cancel()
     _tasks.clear()
+    _status.clear()

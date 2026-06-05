@@ -14,6 +14,24 @@ router = APIRouter(tags=["triggers"])
 mgmt_router = APIRouter(prefix="/api/triggers", tags=["triggers"], dependencies=[Depends(get_current_user)])
 
 
+@mgmt_router.get("/status")
+async def trigger_status(db: AsyncSession = Depends(get_db)):
+    """Return connection status for all trigger sources."""
+    from ..services.bemfa import get_status as bemfa_status
+    from ..services.mqtt import get_status as mqtt_status
+    from ..services.telegram_bot import get_status as telegram_status
+
+    service_status = {**bemfa_status(), **mqtt_status(), **telegram_status()}
+
+    result = await db.execute(
+        select(TriggerSource).where(TriggerSource.type == "http_api", TriggerSource.enabled.is_(True))
+    )
+    for t in result.scalars().all():
+        service_status[t.id] = "connected"
+
+    return service_status
+
+
 @mgmt_router.get("", response_model=List[TriggerOut])
 async def list_triggers(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(TriggerSource).order_by(TriggerSource.id))

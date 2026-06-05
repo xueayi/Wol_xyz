@@ -24,6 +24,9 @@
   - Telegram Bot — 交互式设备管理（查看状态/开关机/扫描/日志）
 - **通知渠道**：邮件（SMTP）、Webhook（内置飞书/企业微信模板）、Telegram，支持多实例
 - **通知类型**：可按渠道独立配置「触发通知」和「任务成功通知」（设备状态确认）
+- **触发源状态监控**：侧边栏实时显示触发渠道连接状态（在线/连接中/离线/禁用）
+- **代理配置**：支持 HTTP/SOCKS5 代理，可在设置面板中手动配置，用于 Telegram 等外部请求
+- **时区控制**：通过 `TZ` 环境变量统一控制所有时间显示，默认 `Asia/Shanghai`
 - **用户管理**：Web 面板内修改账号密码、重新生成 JWT 密钥
 - **操作日志**：记录所有操作的成功/失败详情
 
@@ -46,6 +49,7 @@ services:
       - ./data:/app/data
     environment:
       - WEB_PORT=39090
+      - TZ=Asia/Shanghai
 ```
 
 启动服务：
@@ -58,16 +62,39 @@ docker compose up -d
 
 > **重要**：使用 `network_mode: host` 确保 WOL 广播和局域网扫描正常工作。
 
+### 从源码构建 Docker 镜像
+
+```bash
+# 克隆仓库
+git clone https://github.com/xueayi/Wol_XYZ.git
+cd Wol_XYZ
+
+# 构建镜像
+docker build -t wol-xyz:latest .
+
+# 使用 docker-compose 启动（会自动使用本地构建的镜像）
+docker compose up -d
+
+# 或直接 docker run
+docker run -d --name wol-xyz --network host \
+  -v ./data:/app/data \
+  -e TZ=Asia/Shanghai \
+  wol-xyz:latest
+```
+
 ### 环境变量
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `WEB_PORT` | `39090` | Web 面板端口 |
 | `PING_INTERVAL` | `60` | Ping 检测间隔（秒） |
+| `TZ` | `Asia/Shanghai` | 时区，影响所有时间显示（如 `America/New_York`、`Europe/London`） |
 
 > 默认管理员账号 `admin` / `admin`，JWT 密钥自动生成。均可在 Web 面板「用户管理」中修改。
 
-### 本地开发（虚拟环境）
+### 本地开发
+
+#### 后端
 
 ```bash
 # 1. 克隆仓库
@@ -83,12 +110,24 @@ source .venv/bin/activate        # Linux / macOS
 pip install -r backend/requirements.txt
 
 # 4. 启动后端（开发模式，自动重载）
+#    可选：TZ=America/New_York 覆盖时区（默认 Asia/Shanghai）
 uvicorn backend.app.main:app --reload --port 39090
+```
 
-# 5. （新终端）安装并启动前端
+#### 前端
+
+```bash
+# 新终端，进入前端目录
 cd frontend
+
+# 安装依赖
 npm install
+
+# 开发模式启动（带热重载）
 npm run dev
+
+# 或构建生产版本（输出到 frontend/dist/）
+npm run build
 ```
 
 前端开发服务器默认在 `http://localhost:5173`，API 请求会代理到后端 `:39090`。

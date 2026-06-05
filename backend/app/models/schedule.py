@@ -3,6 +3,7 @@ from typing import Optional
 from sqlalchemy import Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from ..database import Base
+from ..tz import tz_now
 
 
 class ScheduledTask(Base):
@@ -16,4 +17,4 @@ class ScheduledTask(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     last_run_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     next_run_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=tz_now)

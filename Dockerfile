@@ -23,6 +23,7 @@ RUN mkdir -p /app/data
 
 ENV DATABASE_URL="sqlite+aiosqlite:///./data/wol_xyz.db"
 ENV WEB_PORT=39090
+ENV TZ="Asia/Shanghai"
 
 EXPOSE 39090
 

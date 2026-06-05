@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+from ..tz import ensure_tz
 
 
 class ScheduleCreate(BaseModel):
@@ -29,5 +31,12 @@ class ScheduleOut(BaseModel):
     last_run_at: Optional[datetime]
     next_run_at: Optional[datetime]
     created_at: datetime
+
+    @field_validator("last_run_at", "next_run_at", "created_at", mode="before")
+    @classmethod
+    def apply_tz(cls, v):
+        if isinstance(v, datetime):
+            return ensure_tz(v)
+        return v
 
     model_config = {"from_attributes": True}

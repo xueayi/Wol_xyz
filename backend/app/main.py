@@ -55,6 +55,7 @@ app = FastAPI(title="Wol_xyz", version="1.0.0", lifespan=lifespan)
 
 # --- Register routers ---
 from .routers import auth, devices, groups, schedules, channels, triggers, logs, dashboard, scan, announcements  # noqa: E402
+from .routers import settings as settings_router  # noqa: E402
 
 app.include_router(auth.router)
 app.include_router(devices.router)
@@ -67,6 +68,7 @@ app.include_router(logs.router)
 app.include_router(dashboard.router)
 app.include_router(scan.router)
 app.include_router(announcements.router)
+app.include_router(settings_router.router)
 
 
 # --- WebSocket for live device status ---

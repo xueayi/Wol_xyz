@@ -46,6 +46,8 @@ async def _send_email(config: dict, title: str, body: str) -> bool:
 
 async def _send_webhook(config: dict, title: str, body: str) -> bool:
     import json as _json
+    from .proxy import get_httpx_client
+
     url = config["url"]
     method = config.get("method", "POST").upper()
 
@@ -77,7 +79,7 @@ async def _send_webhook(config: dict, title: str, body: str) -> bool:
         return v
 
     data = _render(payload)
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with await get_httpx_client(timeout=10) as client:
         if method == "GET":
             resp = await client.get(url, params=data if isinstance(data, dict) else {}, headers=headers)
         else:
@@ -87,6 +89,8 @@ async def _send_webhook(config: dict, title: str, body: str) -> bool:
 
 
 async def _send_telegram(config: dict, title: str, body: str) -> bool:
+    from .proxy import get_httpx_client
+
     bot_token = config.get("bot_token", "")
     chat_ids_raw = config.get("chat_ids", "")
     if not bot_token or not chat_ids_raw:
@@ -99,7 +103,7 @@ async def _send_telegram(config: dict, title: str, body: str) -> bool:
         chat_ids = [int(x.strip()) for x in chat_ids_raw.split(",") if x.strip()]
 
     text = f"<b>{title}</b>\n{body}"
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with await get_httpx_client(timeout=10) as client:
         for cid in chat_ids:
             await client.post(
                 f"https://api.telegram.org/bot{bot_token}/sendMessage",

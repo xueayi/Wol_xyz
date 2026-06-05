@@ -9,3 +9,4 @@ services:
       - ./data:/app/data
     environment:
       - WEB_PORT=39090
+      - TZ=Asia/Shanghai

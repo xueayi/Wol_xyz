@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2026-06-05
+
+### Added
+
+- 触发源状态监控：侧边栏新增「触发源状态」卡片，实时显示各触发渠道连接状态（在线/连接中/离线/禁用）
+- 代理配置：设置面板新增代理设置（HTTP/SOCKS5），Telegram Bot 和 Webhook 通知自动应用代理，保存后立即生效无需重启
+- 时区环境变量 `TZ`：统一控制所有时间显示，默认 `Asia/Shanghai`，支持通过环境变量或 `.env` 覆盖
+- 局域网扫描增强：新增 NetBIOS、mDNS、gethostbyaddr 多种主机名解析方式
+- Linux 部署时自动识别并过滤 Docker 创建的虚拟网卡和子网
+- 新增 `GET /api/settings/timezone` 接口供前端获取当前时区配置
+
+### Changed
+
+- 代理设置表单始终可编辑和测试，启用开关仅控制是否在实际请求中应用代理
+- 所有后端时间戳统一使用 `tz_now()` 生成（替代 `datetime.utcnow()`），确保时间一致性
+- 所有 API 响应的时间字段附带时区偏移信息（如 `+08:00`），前端无需额外转换
+- 定时任务编辑/删除按钮优化间距
+- 触发源管理表格操作列边框对齐修复
+- 巴法云配置说明措辞修正（插座→开关，Topic→主题）
+- 触发源管理和定时任务弹窗重新打开时自动回到一级页面
+- 分组管理/批量管理按钮适配手机竖屏布局
+- Dockerfile 和 docker-compose.yml 新增 `TZ` 环境变量
+
+### Fixed
+
+- 最近触发记录时间偏差 8 小时的 UTC 时区问题
+- 前端 `RecentLogs` 时间解析兼容带时区后缀的 ISO 字符串
+
 ## [0.3.1] - 2026-06-05
 
 ### Fixed

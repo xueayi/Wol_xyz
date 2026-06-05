@@ -4,9 +4,13 @@ import { useMessage } from 'naive-ui'
 import { getSchedules, createSchedule, updateSchedule, deleteSchedule } from '../../api/schedules'
 import { getDevices } from '../../api/devices'
 
-defineProps<{ show: boolean }>()
+const props = defineProps<{ show: boolean }>()
 const emit = defineEmits(['update:show', 'saved'])
 const msg = useMessage()
+
+watch(() => props.show, (val) => {
+  if (val) showForm.value = false
+})
 
 const schedules = ref<any[]>([])
 const devices = ref<any[]>([])
@@ -163,11 +167,13 @@ const deviceOptions = () => devices.value.map((d: any) => ({ label: d.name, valu
             <td style="font-size:13px">{{ describeSchedule(s.cron_expression) }}</td>
             <td><n-tag :type="s.enabled ? 'success' : 'default'" size="tiny">{{ s.enabled ? '启用' : '停用' }}</n-tag></td>
             <td>
-              <n-button text size="tiny" @click="openEdit(s)">编辑</n-button>
-              <n-popconfirm @positive-click="handleDelete(s.id)">
-                <template #trigger><n-button text size="tiny" type="error">删除</n-button></template>
-                确定删除此任务？
-              </n-popconfirm>
+              <div style="display:flex;gap:8px;align-items:center;white-space:nowrap">
+                <n-button text size="tiny" @click="openEdit(s)">编辑</n-button>
+                <n-popconfirm @positive-click="handleDelete(s.id)">
+                  <template #trigger><n-button text size="tiny" type="error">删除</n-button></template>
+                  确定删除此任务？
+                </n-popconfirm>
+              </div>
             </td>
           </tr>
         </tbody>

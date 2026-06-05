@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy import Integer, String, Boolean, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from ..database import Base
+from ..tz import tz_now
 
 
 class NotificationChannel(Base):
@@ -14,4 +15,4 @@ class NotificationChannel(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     notify_on_trigger: Mapped[bool] = mapped_column(Boolean, default=True)
     notify_on_success: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=tz_now)

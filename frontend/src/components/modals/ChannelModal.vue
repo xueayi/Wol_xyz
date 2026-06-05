@@ -121,13 +121,15 @@ async function handleDelete(id: number) {
             <td>{{ ch.name }}</td>
             <td>{{ { email: '邮件', webhook: 'Webhook', telegram: 'Telegram' }[ch.type] || ch.type }}</td>
             <td><n-tag :type="ch.enabled ? 'success' : 'default'" size="tiny">{{ ch.enabled ? '启用' : '禁用' }}</n-tag></td>
-            <td style="display:flex;gap:4px">
-              <n-button text size="tiny" @click="handleTest(ch.id)" :loading="testing === ch.id">测试</n-button>
-              <n-button text size="tiny" @click="openEdit(ch)">编辑</n-button>
-              <n-popconfirm @positive-click="handleDelete(ch.id)">
-                <template #trigger><n-button text size="tiny" type="error">删除</n-button></template>
-                确定删除此渠道？
-              </n-popconfirm>
+            <td>
+              <div style="display:flex;gap:8px;align-items:center;white-space:nowrap">
+                <n-button text size="tiny" @click="handleTest(ch.id)" :loading="testing === ch.id">测试</n-button>
+                <n-button text size="tiny" @click="openEdit(ch)">编辑</n-button>
+                <n-popconfirm @positive-click="handleDelete(ch.id)">
+                  <template #trigger><n-button text size="tiny" type="error">删除</n-button></template>
+                  确定删除此渠道？
+                </n-popconfirm>
+              </div>
             </td>
           </tr>
         </tbody>

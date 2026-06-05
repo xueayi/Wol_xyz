@@ -5,8 +5,10 @@ from .schedule import ScheduledTask
 from .trigger import TriggerSource
 from .channel import NotificationChannel
 from .log import OperationLog
+from .setting import Setting
 
 __all__ = [
     "User", "DeviceGroup", "Device", "ScheduledTask",
     "TriggerSource", "NotificationChannel", "OperationLog",
+    "Setting",
 ]

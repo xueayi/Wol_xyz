@@ -5,7 +5,8 @@ const emit = defineEmits(['viewAll'])
 const actionLabels: Record<string, string> = { wake: '开机', shutdown: '关机', scan: '扫描' }
 
 function timeAgo(dt: string) {
-  const diff = Date.now() - new Date(dt).getTime()
+  const timestamp = dt.endsWith('Z') || dt.includes('+') ? dt : dt + 'Z'
+  const diff = Date.now() - new Date(timestamp).getTime()
   const m = Math.floor(diff / 60000)
   if (m < 1) return '刚刚'
   if (m < 60) return `${m}分钟前`

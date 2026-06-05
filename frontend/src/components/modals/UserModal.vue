@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { changePassword, changeUsername, regenerateSecret } from '../../api/auth'
+import { getProxyConfig, updateProxyConfig, testProxyConfig } from '../../api/settings'
 import { useAuthStore } from '../../stores/auth'
 
-defineProps<{ show: boolean }>()
+const props = defineProps<{ show: boolean }>()
 const emit = defineEmits(['update:show'])
 const msg = useMessage()
 const auth = useAuthStore()
@@ -13,6 +14,56 @@ const activeTab = ref('password')
 const pwdForm = ref({ current: '', newPwd: '', confirm: '' })
 const usernameForm = ref({ newUsername: '', password: '' })
 const saving = ref(false)
+
+const proxyForm = ref({
+  proxy_enabled: false,
+  proxy_type: 'http',
+  proxy_host: '',
+  proxy_port: 7890,
+  proxy_username: '',
+  proxy_password: '',
+})
+const proxyLoading = ref(false)
+const proxyTesting = ref(false)
+
+watch(() => props.show, async (val) => {
+  if (val && activeTab.value === 'proxy') {
+    await loadProxy()
+  }
+})
+
+watch(activeTab, async (val) => {
+  if (val === 'proxy') await loadProxy()
+})
+
+async function loadProxy() {
+  proxyLoading.value = true
+  try {
+    const { data } = await getProxyConfig()
+    proxyForm.value = data
+  } catch { /* ignore */ }
+  finally { proxyLoading.value = false }
+}
+
+async function handleSaveProxy() {
+  saving.value = true
+  try {
+    await updateProxyConfig(proxyForm.value)
+    msg.success('代理配置已保存，立即生效')
+  } catch (e: any) {
+    msg.error(e.response?.data?.detail || '保存失败')
+  } finally { saving.value = false }
+}
+
+async function handleTestProxy() {
+  proxyTesting.value = true
+  try {
+    const { data } = await testProxyConfig(proxyForm.value)
+    data.success ? msg.success(data.detail) : msg.error(data.detail)
+  } catch (e: any) {
+    msg.error('测试失败')
+  } finally { proxyTesting.value = false }
+}
 
 async function handleChangePassword() {
   if (!pwdForm.value.current || !pwdForm.value.newPwd) {
@@ -96,6 +147,42 @@ async function handleRegenSecret() {
             重新生成密钥
           </n-button>
         </div>
+      </n-tab-pane>
+
+      <n-tab-pane name="proxy" tab="代理设置">
+        <n-spin :show="proxyLoading">
+          <n-form label-placement="left" label-width="80" style="margin-top: 8px">
+            <n-form-item label="启用代理">
+              <n-switch v-model:value="proxyForm.proxy_enabled" />
+              <span style="margin-left:8px;font-size:12px;color:#999">{{ proxyForm.proxy_enabled ? '已启用，保存后立即生效' : '关闭后代理不会应用于请求' }}</span>
+            </n-form-item>
+            <n-form-item label="代理类型">
+              <n-radio-group v-model:value="proxyForm.proxy_type">
+                <n-radio-button value="http">HTTP</n-radio-button>
+                <n-radio-button value="socks5">SOCKS5</n-radio-button>
+              </n-radio-group>
+            </n-form-item>
+            <n-form-item label="地址">
+              <n-input v-model:value="proxyForm.proxy_host" placeholder="127.0.0.1" />
+            </n-form-item>
+            <n-form-item label="端口">
+              <n-input-number v-model:value="proxyForm.proxy_port" :min="1" :max="65535" style="width: 140px" />
+            </n-form-item>
+            <n-form-item label="用户名">
+              <n-input v-model:value="proxyForm.proxy_username" placeholder="可选" />
+            </n-form-item>
+            <n-form-item label="密码">
+              <n-input v-model:value="proxyForm.proxy_password" type="password" show-password-on="click" placeholder="可选" />
+            </n-form-item>
+            <div style="display:flex;gap:8px">
+              <n-button type="primary" :loading="saving" @click="handleSaveProxy" style="flex:1">保存</n-button>
+              <n-button :loading="proxyTesting" @click="handleTestProxy" :disabled="!proxyForm.proxy_host">测试连接</n-button>
+            </div>
+            <div style="font-size:12px;color:#999;margin-top:12px;line-height:1.6;padding:8px 12px;background:rgba(0,122,255,0.05);border-radius:8px;border-left:3px solid #007AFF">
+              代理用于 Telegram Bot、Webhook 通知等需要访问外网的服务。保存后立即生效，无需重启。
+            </div>
+          </n-form>
+        </n-spin>
       </n-tab-pane>
     </n-tabs>
   </n-modal>

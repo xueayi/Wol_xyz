@@ -10,6 +10,11 @@ from ..models.device import Device
 logger = logging.getLogger(__name__)
 
 _tasks: dict[int, asyncio.Task] = {}
+_status: dict[int, str] = {}
+
+
+def get_status() -> dict[int, str]:
+    return dict(_status)
 
 
 async def start_mqtt_clients():
@@ -24,6 +29,7 @@ async def start_mqtt_clients():
 def _start_one(trigger_id: int, config: dict):
     if trigger_id in _tasks and not _tasks[trigger_id].done():
         _tasks[trigger_id].cancel()
+    _status[trigger_id] = "connecting"
     _tasks[trigger_id] = asyncio.create_task(_mqtt_loop(trigger_id, config))
 
 
@@ -42,10 +48,16 @@ async def _mqtt_loop(trigger_id: int, config: dict):
 
     def on_connect(client, userdata, flags, rc, properties=None):
         if rc == 0:
+            _status[trigger_id] = "connected"
             logger.info("MQTT trigger %d connected to %s:%d", trigger_id, host, port)
             client.subscribe(topic)
         else:
+            _status[trigger_id] = "disconnected"
             logger.error("MQTT trigger %d connect failed: rc=%d", trigger_id, rc)
+
+    def on_disconnect(client, userdata, rc, properties=None, reason=None):
+        _status[trigger_id] = "connecting"
+        logger.warning("MQTT trigger %d disconnected (rc=%s), will reconnect", trigger_id, rc)
 
     def on_message(client, userdata, msg):
         payload = msg.payload.decode(errors="ignore").strip().lower()
@@ -68,6 +80,7 @@ async def _mqtt_loop(trigger_id: int, config: dict):
     if username:
         client.username_pw_set(username, password)
     client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
     client.on_message = on_message
 
     while True:
@@ -75,10 +88,13 @@ async def _mqtt_loop(trigger_id: int, config: dict):
             await loop.run_in_executor(None, lambda: client.connect(host, port, 60))
             await loop.run_in_executor(None, client.loop_forever)
         except asyncio.CancelledError:
+            _status.pop(trigger_id, None)
             client.disconnect()
             break
         except Exception as e:
+            _status[trigger_id] = "disconnected"
             logger.error("MQTT trigger %d error: %s", trigger_id, e)
+            _status[trigger_id] = "connecting"
             await asyncio.sleep(5)
 
 
@@ -121,3 +137,4 @@ def stop_all():
     for t in _tasks.values():
         t.cancel()
     _tasks.clear()
+    _status.clear()

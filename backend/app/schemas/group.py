@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+from ..tz import ensure_tz
 
 
 class GroupCreate(BaseModel):
@@ -22,6 +24,13 @@ class GroupOut(BaseModel):
     sort_order: int
     created_at: datetime
     device_count: int = 0
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def apply_tz(cls, v):
+        if isinstance(v, datetime):
+            return ensure_tz(v)
+        return v
 
     model_config = {"from_attributes": True}
 

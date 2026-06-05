@@ -2,12 +2,12 @@ import asyncio
 import platform
 import logging
 import time
-from datetime import datetime
 
 from sqlalchemy import select
 from ..database import async_session
 from ..models.device import Device
 from ..config import settings
+from ..tz import tz_now
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ async def ping_loop():
                     changed = d.is_online != new_online
                     d.is_online = new_online
                     if new_online:
-                        d.last_seen_at = datetime.utcnow()
+                        d.last_seen_at = tz_now()
                     if changed:
                         await _broadcast_status(d.id, new_online)
                         if d.id in _pending_checks:

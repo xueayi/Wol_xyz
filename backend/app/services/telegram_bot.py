@@ -8,10 +8,16 @@ from sqlalchemy import select
 from ..database import async_session
 from ..models.trigger import TriggerSource
 from ..models.device import Device
+from ..tz import ensure_tz
 
 logger = logging.getLogger(__name__)
 
 _bots: dict[int, asyncio.Task] = {}
+_status: dict[int, str] = {}
+
+
+def get_status() -> dict[int, str]:
+    return dict(_status)
 
 
 async def start_telegram_bots():
@@ -26,6 +32,7 @@ async def start_telegram_bots():
 def _start_one(trigger_id: int, config: dict):
     if trigger_id in _bots and not _bots[trigger_id].done():
         _bots[trigger_id].cancel()
+    _status[trigger_id] = "connecting"
     _bots[trigger_id] = asyncio.create_task(_bot_loop(trigger_id, config))
 
 
@@ -33,6 +40,7 @@ def stop_all():
     for t in _bots.values():
         t.cancel()
     _bots.clear()
+    _status.clear()
 
 
 class TelegramBot:
@@ -43,10 +51,24 @@ class TelegramBot:
         self.allowed_chats = allowed_chats
         self.base = f"https://api.telegram.org/bot{token}"
         self.client: Optional[httpx.AsyncClient] = None
+        self._proxy_url: Optional[str] = None
+
+    async def _ensure_client(self):
+        from .proxy import get_proxy_config, build_proxy_url
+        cfg = await get_proxy_config()
+        new_proxy = build_proxy_url(cfg)
+        if self.client and new_proxy == self._proxy_url:
+            return
+        if self.client:
+            await self.client.aclose()
+        client_kwargs: dict = {"timeout": 60}
+        if new_proxy:
+            client_kwargs["proxy"] = new_proxy
+        self.client = httpx.AsyncClient(**client_kwargs)
+        self._proxy_url = new_proxy
 
     async def _request(self, method: str, **kwargs) -> dict:
-        if not self.client:
-            self.client = httpx.AsyncClient(timeout=60)
+        await self._ensure_client()
         resp = await self.client.post(f"{self.base}/{method}", json=kwargs)
         data = resp.json()
         if not data.get("ok"):
@@ -180,7 +202,7 @@ class TelegramBot:
         lines = ["<b>📋 最近操作日志</b>\n"]
         for log in logs:
             icon = "✅" if log.status == "success" else "❌"
-            time_str = log.created_at.strftime("%m-%d %H:%M")
+            time_str = ensure_tz(log.created_at).strftime("%m-%d %H:%M")
             lines.append(f"{icon} [{time_str}] {log.action} — {log.detail[:40]}")
 
         await self.send_message(chat_id, "\n".join(lines))
@@ -264,6 +286,7 @@ class TelegramBot:
 async def _bot_loop(trigger_id: int, config: dict):
     token = config.get("bot_token", "")
     if not token:
+        _status[trigger_id] = "disconnected"
         logger.error("Telegram trigger %d: missing bot_token", trigger_id)
         return
 
@@ -282,6 +305,7 @@ async def _bot_loop(trigger_id: int, config: dict):
         while True:
             try:
                 updates = await bot.get_updates(offset=offset)
+                _status[trigger_id] = "connected"
                 for upd in updates:
                     offset = upd["update_id"] + 1
                     try:
@@ -291,8 +315,11 @@ async def _bot_loop(trigger_id: int, config: dict):
             except asyncio.CancelledError:
                 raise
             except Exception as e:
+                _status[trigger_id] = "disconnected"
                 logger.error("Telegram poll error: %s", e)
+                _status[trigger_id] = "connecting"
                 await asyncio.sleep(5)
     finally:
+        _status.pop(trigger_id, None)
         await bot.close()
         logger.info("Telegram bot stopped for trigger %d", trigger_id)

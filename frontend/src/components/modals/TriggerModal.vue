@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { getTriggers, createTrigger, updateTrigger, deleteTrigger } from '../../api/triggers'
 
-defineProps<{ show: boolean }>()
+const props = defineProps<{ show: boolean }>()
 const emit = defineEmits(['update:show', 'saved'])
 const msg = useMessage()
+
+watch(() => props.show, (val) => {
+  if (val) showForm.value = false
+})
 
 const triggers = ref<any[]>([])
 const showForm = ref(false)
@@ -103,12 +107,14 @@ function generateToken() {
             <td>{{ t.name }}</td>
             <td>{{ typeLabel[t.type] || t.type }}</td>
             <td><n-tag :type="t.enabled ? 'success' : 'default'" size="tiny">{{ t.enabled ? '启用' : '禁用' }}</n-tag></td>
-            <td style="display:flex;gap:4px">
-              <n-button text size="tiny" @click="openEdit(t)">编辑</n-button>
-              <n-popconfirm @positive-click="handleDelete(t.id)">
-                <template #trigger><n-button text size="tiny" type="error">删除</n-button></template>
-                确定删除此触发源？
-              </n-popconfirm>
+            <td>
+              <div style="display:flex;gap:8px;align-items:center;white-space:nowrap">
+                <n-button text size="tiny" @click="openEdit(t)">编辑</n-button>
+                <n-popconfirm @positive-click="handleDelete(t.id)">
+                  <template #trigger><n-button text size="tiny" type="error">删除</n-button></template>
+                  确定删除此触发源？
+                </n-popconfirm>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -138,9 +144,9 @@ function generateToken() {
 
         <template v-if="form.type === 'bemfa'">
           <n-form-item label="UID (私钥)"><n-input v-model:value="form.config.uid" placeholder="巴法云控制台获取" /></n-form-item>
-          <n-form-item label="Topic"><n-input v-model:value="form.config.topic" placeholder="巴法云主题名称" /></n-form-item>
+          <n-form-item label="主题"><n-input v-model:value="form.config.topic" placeholder="巴法云主题名称" /></n-form-item>
           <div class="config-hint">
-            在 <a href="https://cloud.bemfa.com" target="_blank" style="color:#007AFF">cloud.bemfa.com</a> 注册获取 UID，创建「插座」类型 Topic
+            在 <a href="https://cloud.bemfa.com" target="_blank" style="color:#007AFF">cloud.bemfa.com</a> 注册获取 UID，创建「开关」类型主题
           </div>
         </template>
 

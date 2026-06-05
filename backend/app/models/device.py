@@ -3,6 +3,7 @@ from typing import Optional
 from sqlalchemy import Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..database import Base
+from ..tz import tz_now
 
 
 class Device(Base):
@@ -20,7 +21,7 @@ class Device(Base):
     shutdown_password_enc: Mapped[str] = mapped_column(String(256), default="")
     is_online: Mapped[bool] = mapped_column(Boolean, default=False)
     last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=tz_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=tz_now, onupdate=tz_now)
 
     group: Mapped[Optional["DeviceGroup"]] = relationship(back_populates="devices")  # noqa: F821

@@ -1,9 +1,9 @@
 import logging
-from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from ..database import async_session
+from ..tz import tz_now
 from ..models.schedule import ScheduledTask
 from ..models.device import Device
 
@@ -91,7 +91,7 @@ async def _execute_task(task_id: int, device_id: int, action: str):
 
         task_obj = (await db.execute(select(ScheduledTask).where(ScheduledTask.id == task_id))).scalar_one_or_none()
         if task_obj:
-            task_obj.last_run_at = datetime.utcnow()
+            task_obj.last_run_at = tz_now()
             await db.commit()
 
     from .notification import notify_all

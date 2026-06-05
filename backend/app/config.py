@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str = "admin"
     PING_INTERVAL: int = 60
     FERNET_KEY: str = ""
+    TZ: str = "Asia/Shanghai"
 
     model_config = {"env_prefix": "", "env_file": str(DATA_DIR / ".env"), "extra": "ignore"}
 

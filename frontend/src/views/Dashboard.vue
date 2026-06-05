@@ -7,6 +7,7 @@ import StatsBar from '../components/StatsBar.vue'
 import DeviceGroup from '../components/DeviceGroup.vue'
 import QuickActions from '../components/QuickActions.vue'
 import ChannelStatus from '../components/ChannelStatus.vue'
+import TriggerStatus from '../components/TriggerStatus.vue'
 import RecentLogs from '../components/RecentLogs.vue'
 import DeviceModal from '../components/modals/DeviceModal.vue'
 import ScanModal from '../components/modals/ScanModal.vue'
@@ -289,6 +290,7 @@ onUnmounted(() => { ws?.close() })
 
       <div class="sidebar">
         <div class="sidebar-card"><QuickActions @action="handleAction" /></div>
+        <div class="sidebar-card"><TriggerStatus :triggers="store.triggers" :status="store.triggerStatus" @manage="showTriggerModal = true" /></div>
         <div class="sidebar-card"><ChannelStatus :channels="store.channels" @add="showChannelModal = true" /></div>
         <div class="sidebar-card"><RecentLogs :logs="store.recentLogs" @view-all="showLogsModal = true" /></div>
       </div>
@@ -600,6 +602,46 @@ onUnmounted(() => { ws?.close() })
 @media (max-width: 1024px) {
   .main-content { grid-template-columns: 1fr; }
   .sidebar { order: -1; }
+}
+@media (max-width: 640px) {
+  .overview-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .toolbar-left {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .toolbar-left h2 {
+    width: 100%;
+    font-size: 16px;
+  }
+  .text-btn {
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+  .toolbar-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .search-box {
+    width: 100%;
+    order: -1;
+  }
+  .batch-bar {
+    width: calc(100% - 32px);
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .batch-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .batch-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
 }
 
 /* Batch action bar */

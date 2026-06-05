@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+from ..tz import ensure_tz
 
 
 class DeviceCreate(BaseModel):
@@ -41,6 +43,13 @@ class DeviceOut(BaseModel):
     last_seen_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("last_seen_at", "created_at", "updated_at", mode="before")
+    @classmethod
+    def apply_tz(cls, v):
+        if isinstance(v, datetime):
+            return ensure_tz(v)
+        return v
 
     model_config = {"from_attributes": True}
 

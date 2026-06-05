@@ -3,6 +3,7 @@ from typing import Optional
 from sqlalchemy import Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from ..database import Base
+from ..tz import tz_now
 
 
 class OperationLog(Base):
@@ -14,4 +15,4 @@ class OperationLog(Base):
     result: Mapped[str] = mapped_column(String(16), nullable=False)  # success / failure
     detail: Mapped[str] = mapped_column(String(512), default="")
     source: Mapped[str] = mapped_column(String(16), default="manual")  # manual / scheduled / external
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=tz_now)
