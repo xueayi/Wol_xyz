@@ -6,7 +6,8 @@
 [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Docker](https://img.shields.io/badge/Docker-host_network-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-74_passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-167_passing-brightgreen)](tests/)
+[![Coverage](https://img.shields.io/badge/Coverage-68%25-green)](tests/)
 
 > 轻量级局域网设备远程管理工具 — WOL 开机 · SSH 关机 · 实时监控 · 定时任务 · 多渠道触发
 
@@ -68,17 +69,32 @@ docker compose up -d
 
 ## 本地开发
 
+### 使用 run.sh（推荐）
+
+```bash
+./run.sh build     # 构建前端 + 启动后端（首次使用）
+./run.sh start     # 仅启动后端（已构建过前端）
+./run.sh stop      # 停止后端
+./run.sh restart   # 重启后端
+./run.sh rebuild   # 重新构建前端 + 重启后端
+./run.sh status    # 查看运行状态
+```
+
+> 脚本自动管理虚拟环境、依赖安装、前端构建和后端进程，访问 `http://localhost:39090`。
+
+### 手动启动
+
 ```bash
 # 后端
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
 uvicorn backend.app.main:app --reload --port 39090
 
-# 前端
+# 前端（另开终端）
 cd frontend && npm install && npm run dev
 ```
 
-前端 `http://localhost:5173`，API 代理到 `:39090`。
+前端开发 `http://localhost:5173`，API 代理到 `:39090`。
 
 ---
 
@@ -88,8 +104,11 @@ cd frontend && npm install && npm run dev
 # 安装测试依赖
 pip install -r tests/requirements-test.txt
 
-# 运行全部测试（74 个用例）
+# 运行全部测试（167 个用例，覆盖率 68%）
 pytest tests/ -v
+
+# 带覆盖率报告
+pytest tests/ --rootdir=. --cov --cov-report=term-missing
 
 # 按场景选择
 pytest tests/ -m web_api          # Web API

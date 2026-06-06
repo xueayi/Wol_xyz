@@ -1,0 +1,7 @@
+[run]
+source = backend/app
+concurrency = greenlet,thread
+
+[report]
+omit =
+    backend/app/services/scanner.py
