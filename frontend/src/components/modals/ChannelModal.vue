@@ -8,15 +8,25 @@ const emit = defineEmits(['update:show', 'saved'])
 const msg = useMessage()
 
 watch(() => props.show, (val) => {
-  if (val) showForm.value = false
+  if (val) {
+    showForm.value = false
+    showTypeSelect.value = false
+  }
 })
 
 const channels = ref<any[]>([])
 const showForm = ref(false)
+const showTypeSelect = ref(false)
 const editItem = ref<any>(null)
-const form = ref({ type: 'webhook', name: '', config: {} as any, enabled: true, notify_on_trigger: true, notify_on_success: false })
+const form = ref({ type: 'webhook', name: '', config: {} as any, enabled: true, notify_on_trigger: false, notify_on_success: true })
 const saving = ref(false)
 const testing = ref<number | null>(null)
+
+const typeOptions = [
+  { type: 'email', label: '邮件', desc: 'SMTP 邮件推送' },
+  { type: 'webhook', label: 'Webhook', desc: '飞书 / 企微 / 自定义 HTTP' },
+  { type: 'telegram', label: 'Telegram', desc: 'Telegram Bot 推送' },
+]
 
 const webhookPresets: Record<string, { label: string; url_hint: string; headers: Record<string, string>; body: string }> = {
   custom: { label: '自定义', url_hint: 'https://...', headers: { 'Content-Type': 'application/json' }, body: '{\n  "title": "{title}",\n  "body": "{body}"\n}' },
@@ -32,16 +42,21 @@ async function loadData() {
   channels.value = data
 }
 
+function openTypeSelect() {
+  showTypeSelect.value = true
+}
+
 function openAdd(type: string) {
   editItem.value = null
+  showTypeSelect.value = false
   if (type === 'email') {
-    form.value = { type, name: '', config: { host: '', port: 587, tls: true, username: '', password: '', from_addr: '', to_addr: '' }, enabled: true, notify_on_trigger: true, notify_on_success: false }
+    form.value = { type, name: '', config: { host: '', port: 587, tls: true, username: '', password: '', from_addr: '', to_addr: '' }, enabled: true, notify_on_trigger: false, notify_on_success: true }
   } else if (type === 'telegram') {
-    form.value = { type, name: '', config: { bot_token: '', chat_ids: '' }, enabled: true, notify_on_trigger: true, notify_on_success: false }
+    form.value = { type, name: '', config: { bot_token: '', chat_ids: '' }, enabled: true, notify_on_trigger: false, notify_on_success: true }
   } else {
     selectedPreset.value = 'custom'
     const p = webhookPresets.custom
-    form.value = { type, name: '', config: { url: '', method: 'POST', headers: JSON.stringify(p.headers, null, 2), body_template: p.body }, enabled: true, notify_on_trigger: true, notify_on_success: false }
+    form.value = { type, name: '', config: { url: '', method: 'POST', headers: JSON.stringify(p.headers, null, 2), body_template: p.body }, enabled: true, notify_on_trigger: false, notify_on_success: true }
   }
   showForm.value = true
 }
@@ -108,13 +123,14 @@ async function handleDelete(id: number) {
 <template>
   <n-modal :show="show" @update:show="emit('update:show', $event)" preset="card"
     title="通知渠道管理" style="width: 680px" :bordered="false" @after-enter="loadData">
-    <template v-if="!showForm">
+    <template v-if="!showForm && !showTypeSelect">
       <div style="display:flex;gap:8px;margin-bottom:12px">
-        <n-button size="small" tertiary @click="openAdd('email')">+ 邮件</n-button>
-        <n-button size="small" tertiary @click="openAdd('webhook')">+ Webhook</n-button>
-        <n-button size="small" tertiary @click="openAdd('telegram')">+ Telegram</n-button>
+        <n-button size="small" tertiary @click="openTypeSelect">+ 新建渠道</n-button>
       </div>
-      <n-table :bordered="false" :single-line="false" size="small">
+      <div v-if="channels.length === 0" style="text-align:center;color:#999;padding:24px 0;font-size:13px">
+        暂无通知渠道，点击上方按钮添加
+      </div>
+      <n-table v-else :bordered="false" :single-line="false" size="small">
         <thead><tr><th>名称</th><th>类型</th><th>状态</th><th>操作</th></tr></thead>
         <tbody>
           <tr v-for="ch in channels" :key="ch.id">
@@ -134,6 +150,17 @@ async function handleDelete(id: number) {
           </tr>
         </tbody>
       </n-table>
+    </template>
+    <template v-else-if="showTypeSelect && !showForm">
+      <div class="type-select-grid">
+        <div v-for="opt in typeOptions" :key="opt.type" class="type-select-card" @click="openAdd(opt.type)">
+          <div class="type-select-label">{{ opt.label }}</div>
+          <div class="type-select-desc">{{ opt.desc }}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-start;margin-top:12px">
+        <n-button size="small" @click="showTypeSelect = false">返回</n-button>
+      </div>
     </template>
     <template v-else>
       <n-form label-placement="left" label-width="80">
@@ -188,9 +215,41 @@ async function handleDelete(id: number) {
         </template>
       </n-form>
       <div style="display:flex;gap:8px;justify-content:flex-end">
-        <n-button @click="showForm = false">返回</n-button>
+        <n-button @click="showForm = false; showTypeSelect = false">返回</n-button>
         <n-button type="primary" :loading="saving" @click="handleSave">保存</n-button>
       </div>
     </template>
   </n-modal>
 </template>
+
+<style scoped>
+.type-select-grid {
+  display: flex;
+  gap: 12px;
+}
+.type-select-card {
+  flex: 1;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(0, 122, 255, 0.04);
+  border: 1px solid rgba(0, 122, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+.type-select-card:hover {
+  background: rgba(0, 122, 255, 0.08);
+  border-color: rgba(0, 122, 255, 0.25);
+  transform: translateY(-1px);
+}
+.type-select-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1c1c1e;
+  margin-bottom: 4px;
+}
+.type-select-desc {
+  font-size: 12px;
+  color: #999;
+}
+</style>

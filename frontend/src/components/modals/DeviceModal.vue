@@ -45,6 +45,7 @@ const hasExistingKey = computed(() => isEdit.value && props.device?.has_private_
 function resetForm() {
   showPublicKey.value = false
   generatedPublicKey.value = ''
+  copyFailed.value = false
 }
 
 watch(() => props.show, async (v) => {
@@ -120,22 +121,33 @@ async function handleGenerateKey() {
   finally { generatingKey.value = false }
 }
 
+const copyFailed = ref(false)
+
 async function copyPublicKey() {
   const text = generatedPublicKey.value
   try {
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(text)
-    } else {
-      const ta = document.createElement('textarea')
-      ta.value = text
-      ta.style.cssText = 'position:fixed;left:-9999px'
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
+      msg.success('公钥已复制到剪贴板')
+      return
     }
-    msg.success('公钥已复制到剪贴板')
-  } catch { msg.error('复制失败') }
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.cssText = 'position:fixed;left:-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    if (ok) {
+      msg.success('公钥已复制到剪贴板')
+    } else {
+      copyFailed.value = true
+      msg.warning('自动复制不可用，请手动选择复制')
+    }
+  } catch {
+    copyFailed.value = true
+    msg.warning('自动复制不可用，请手动选择复制')
+  }
 }
 
 const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value: g.id }))
@@ -151,7 +163,6 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
       <n-form-item label="设备类型">
         <n-select v-model:value="form.device_type" :options="deviceTypeOptions" />
       </n-form-item>
-      <n-form-item label="网卡名称"><n-input v-model:value="form.adapter_name" placeholder="可选" /></n-form-item>
       <n-form-item label="分组">
         <n-select v-model:value="form.group_id" :options="groupOptions()" clearable placeholder="选择分组" />
       </n-form-item>
@@ -179,8 +190,7 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
           <n-form-item label="SSH 私钥">
             <div style="width:100%">
               <div v-if="hasExistingKey && !form.shutdown_private_key && !showPublicKey" class="cred-mask-block">
-                <span>••••••••••••••••</span>
-                <span style="font-size:11px;color:#999;margin-left:8px">已配置，点击下方修改或重新生成</span>
+                <span>•••••••• 已配置</span>
               </div>
               <n-input v-else v-model:value="form.shutdown_private_key" type="textarea" :rows="4"
                 :placeholder="hasExistingKey ? '已配置，留空保持不变。也可粘贴新私钥或点击下方生成' : '粘贴 PEM 格式私钥，或点击下方按钮一键生成'" />
@@ -200,7 +210,8 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
               <span class="pubkey-label">公钥（复制后添加到目标设备的 authorized_keys）</span>
               <n-button size="tiny" quaternary type="primary" @click="copyPublicKey">复制</n-button>
             </div>
-            <code class="pubkey-text">{{ generatedPublicKey }}</code>
+            <code class="pubkey-text" :class="{ selectable: copyFailed }" @click="copyFailed && ($event.target as HTMLElement)?.ownerDocument?.getSelection()?.selectAllChildren($event.target as Node)">{{ generatedPublicKey }}</code>
+            <p v-if="copyFailed" class="pubkey-copy-tip">当前环境不支持自动复制（HTTP 非安全上下文），请手动选中上方公钥后 Ctrl+C / Cmd+C 复制</p>
             <p class="pubkey-hint">
               Linux/macOS: <code>echo "公钥" >> ~/.ssh/authorized_keys</code><br/>
               Windows 管理员: <code>Add-Content C:\ProgramData\ssh\administrators_authorized_keys "公钥"</code>
@@ -275,6 +286,17 @@ const groupOptions = () => groups.value.map((g: any) => ({ label: g.name, value:
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 10px;
+}
+.pubkey-text.selectable {
+  cursor: text;
+  user-select: all;
+  -webkit-user-select: all;
+}
+.pubkey-copy-tip {
+  font-size: 11px;
+  color: #e67e22;
+  margin: 4px 0 0;
+  line-height: 1.5;
 }
 .shutdown-guide-inline {
   margin: 4px 0 0;

@@ -9,3 +9,8 @@ frontend/dist/
 .venv/
 *.tsbuildinfo
 test/
+docs/superpowers/
+docs/test/
+.backend.pid
+.coverage
+.pytest_cache/

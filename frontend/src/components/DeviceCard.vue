@@ -95,10 +95,6 @@ function timeAgo(dt: string | null) {
         <svg class="info-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" stroke-linecap="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
         <span class="value mono">{{ device.mac }}</span>
       </div>
-      <div class="info-row" v-if="device.adapter_name">
-        <svg class="info-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" stroke-linecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-        <span class="value">{{ device.adapter_name }}</span>
-      </div>
       <div class="info-row">
         <svg class="info-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span class="value">最后在线：{{ timeAgo(device.last_seen_at) }}</span>

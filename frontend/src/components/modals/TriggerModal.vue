@@ -2,6 +2,8 @@
 import { ref, watch, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { getTriggers, createTrigger, updateTrigger, deleteTrigger } from '../../api/triggers'
+import { getDevices } from '../../api/devices'
+import { getGroups } from '../../api/groups'
 
 const props = defineProps<{ show: boolean }>()
 const emit = defineEmits(['update:show', 'saved'])
@@ -16,6 +18,21 @@ const showForm = ref(false)
 const editItem = ref<any>(null)
 const form = ref({ type: 'http_api', name: '', config: {} as any, enabled: true })
 const saving = ref(false)
+
+const devices = ref<any[]>([])
+const groups = ref<any[]>([])
+const targetMode = ref<'all' | 'device' | 'group'>('all')
+const targetDeviceIds = ref<number[]>([])
+const targetGroupId = ref<number | null>(null)
+
+const deviceOptions = computed(() => devices.value.map((d: any) => ({ label: `${d.name} (${d.ip})`, value: d.id })))
+const groupOptions = computed(() => groups.value.map((g: any) => ({ label: g.name, value: g.id })))
+
+async function loadDevicesAndGroups() {
+  const [devRes, grpRes] = await Promise.all([getDevices(), getGroups()])
+  devices.value = devRes.data
+  groups.value = grpRes.data
+}
 
 const typeOptions = [
   { label: 'API', value: 'http_api' },
@@ -46,15 +63,31 @@ function getDefaults(type: string): any {
   }
 }
 
-function openAdd() {
+async function openAdd() {
   editItem.value = null
   form.value = { type: 'http_api', name: '', config: getDefaults('http_api'), enabled: true }
+  targetMode.value = 'all'
+  targetDeviceIds.value = []
+  targetGroupId.value = null
+  await loadDevicesAndGroups()
   showForm.value = true
 }
 
-function openEdit(item: any) {
+async function openEdit(item: any) {
   editItem.value = item
   form.value = { type: item.type, name: item.name, config: { ...item.config }, enabled: item.enabled }
+  if (item.config.target_device_ids?.length) {
+    targetMode.value = 'device'
+    targetDeviceIds.value = item.config.target_device_ids
+  } else if (item.config.target_group_id != null) {
+    targetMode.value = 'group'
+    targetGroupId.value = item.config.target_group_id
+  } else {
+    targetMode.value = 'all'
+  }
+  targetDeviceIds.value = item.config.target_device_ids || []
+  targetGroupId.value = item.config.target_group_id ?? null
+  await loadDevicesAndGroups()
   showForm.value = true
 }
 
@@ -67,8 +100,16 @@ async function handleSave() {
   if (!form.value.name.trim()) { msg.warning('请输入名称'); return }
   saving.value = true
   try {
-    if (editItem.value) await updateTrigger(editItem.value.id, form.value)
-    else await createTrigger(form.value)
+    const payload = { ...form.value, config: { ...form.value.config } }
+    delete payload.config.target_device_ids
+    delete payload.config.target_group_id
+    if (targetMode.value === 'device' && targetDeviceIds.value.length) {
+      payload.config.target_device_ids = targetDeviceIds.value
+    } else if (targetMode.value === 'group' && targetGroupId.value != null) {
+      payload.config.target_group_id = targetGroupId.value
+    }
+    if (editItem.value) await updateTrigger(editItem.value.id, payload)
+    else await createTrigger(payload)
     showForm.value = false
     await loadData()
     emit('saved')
@@ -127,6 +168,22 @@ function generateToken() {
         </n-form-item>
         <n-form-item label="名称"><n-input v-model:value="form.name" placeholder="为该触发源命名" /></n-form-item>
         <n-form-item label="启用"><n-switch v-model:value="form.enabled" /></n-form-item>
+
+        <n-divider>目标设备</n-divider>
+
+        <n-form-item label="范围">
+          <n-radio-group v-model:value="targetMode">
+            <n-radio-button value="all" label="全部设备" />
+            <n-radio-button value="device" label="指定设备" />
+            <n-radio-button value="group" label="指定分组" />
+          </n-radio-group>
+        </n-form-item>
+        <n-form-item v-if="targetMode === 'device'" label="选择设备">
+          <n-select v-model:value="targetDeviceIds" :options="deviceOptions" multiple filterable placeholder="选择一个或多个设备" />
+        </n-form-item>
+        <n-form-item v-if="targetMode === 'group'" label="选择分组">
+          <n-select v-model:value="targetGroupId" :options="groupOptions" placeholder="选择一个分组" clearable />
+        </n-form-item>
 
         <n-divider>{{ typeLabel[form.type] }} 配置</n-divider>
 

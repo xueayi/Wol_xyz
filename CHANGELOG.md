@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-06-06
+
+### Added
+
+- 分组批量唤醒/关机 API：`POST /api/devices/batch-wake` 和 `batch-shutdown`，支持按设备 ID 列表或分组 ID 批量操作
+- 自动化测试流水线：pytest + FastAPI TestClient 全场景测试，74 个测试用例覆盖全部 6 种触发源
+- 虚拟开关机校验后端：内存状态机模拟设备上下线，无需真实设备即可验证完整链路
+- 测试覆盖矩阵：Web API / External HTTP / 定时任务 / 巴法云 / MQTT / Telegram × Windows/Linux/macOS
+- GitHub Actions CI 流水线：push/PR 自动触发测试 + 覆盖率报告
+- 本地测试脚本 `tests/run_tests.sh`，支持 marker 选择性运行
+- 跨平台关机命令验证测试（确保各平台映射正确）
+- 分组批量操作测试场景（按分组/按 ID 列表/空分组/禁用设备 等边界 case）
+
+### Changed
+
+- 通知渠道 / 触发源 / 设备管理弹窗 UI 优化
+
 ## [1.0.4] - 2026-06-06
 
 ### Added

@@ -56,7 +56,22 @@ watch(() => props.show, (v) => {
             <n-divider />
 
             <h3>远程关机 (SSH)</h3>
-            <p class="trigger-desc">通过 SSH 连接目标设备执行关机命令，支持密码和密钥对两种认证方式。</p>
+            <p class="trigger-desc">通过 SSH 连接目标设备执行关机命令，支持密码和密钥对两种认证方式。不同平台的关机行为如下：</p>
+
+            <div class="platform-shutdown-info">
+              <div class="platform-item">
+                <h4>Windows</h4>
+                <p>执行 <code>shutdown /s /t 0</code> 立即关机。需确保 SSH 用户具有关机权限（通常管理员账户即可）。</p>
+              </div>
+              <div class="platform-item">
+                <h4>Linux</h4>
+                <p>执行 <code>shutdown -h now</code>。非 root 用户需配置 sudo 免密（见下方说明），否则会因权限不足失败。</p>
+              </div>
+              <div class="platform-item">
+                <h4>macOS</h4>
+                <p>执行 <code>sudo shutdown -h now</code>。需先在「系统设置 → 通用 → 共享」中开启「远程登录」，且 SSH 用户需有 sudo 权限。</p>
+              </div>
+            </div>
 
             <n-collapse>
               <n-collapse-item title="1. 确保目标设备已开启 SSH" name="ssh-enable">
@@ -364,5 +379,34 @@ Add-Content $path $key</pre></code>
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 12px;
+}
+.platform-shutdown-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.platform-item {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.platform-item h4 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: #1c1c1e;
+}
+.platform-item p {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.6;
+}
+.platform-item code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'SF Mono', SFMono-Regular, Menlo, monospace;
 }
 </style>

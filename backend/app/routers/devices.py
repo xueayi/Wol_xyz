@@ -7,7 +7,10 @@ from ..database import get_db
 from ..auth import get_current_user
 from ..models.device import Device
 from ..models.user import User
-from ..schemas.device import DeviceCreate, DeviceUpdate, DeviceOut, BatchDeleteRequest, BatchMoveRequest
+from ..schemas.device import (
+    DeviceCreate, DeviceUpdate, DeviceOut,
+    BatchDeleteRequest, BatchMoveRequest, BatchWakeRequest, BatchShutdownRequest,
+)
 from ..crypto import encrypt
 from typing import Optional
 
@@ -122,6 +125,72 @@ async def generate_keypair(user: User = Depends(get_current_user)):
         format=serialization.PublicFormat.OpenSSH,
     ).decode()
     return {"private_key": private_pem, "public_key": public_key + " wol_xyz"}
+
+
+@router.post("/batch-wake", status_code=200)
+async def batch_wake_devices(body: BatchWakeRequest, db: AsyncSession = Depends(get_db)):
+    """Batch wake devices by IDs or by group_id."""
+    from ..services.wol import send_wol
+    from ..services.log_writer import write_log
+
+    q = select(Device)
+    if body.ids:
+        q = q.where(Device.id.in_(body.ids))
+    elif body.group_id is not None:
+        q = q.where(Device.group_id == body.group_id)
+    else:
+        raise HTTPException(status_code=400, detail="请指定设备ID列表或分组ID")
+
+    result = await db.execute(q)
+    devices = result.scalars().all()
+    if not devices:
+        raise HTTPException(status_code=404, detail="未找到匹配的设备")
+
+    results = []
+    for device in devices:
+        ok, detail = await send_wol(device.mac)
+        await write_log(db, device.id, "wake", "success" if ok else "failure", detail, "manual")
+        results.append({"device_id": device.id, "name": device.name, "success": ok, "detail": detail})
+    return {"total": len(results), "results": results}
+
+
+@router.post("/batch-shutdown", status_code=200)
+async def batch_shutdown_devices(body: BatchShutdownRequest, db: AsyncSession = Depends(get_db)):
+    """Batch shutdown devices by IDs or by group_id."""
+    from ..services.shutdown import send_shutdown
+    from ..services.log_writer import write_log
+    from ..crypto import decrypt
+
+    q = select(Device)
+    if body.ids:
+        q = q.where(Device.id.in_(body.ids))
+    elif body.group_id is not None:
+        q = q.where(Device.group_id == body.group_id)
+    else:
+        raise HTTPException(status_code=400, detail="请指定设备ID列表或分组ID")
+
+    result = await db.execute(q)
+    devices = result.scalars().all()
+    if not devices:
+        raise HTTPException(status_code=404, detail="未找到匹配的设备")
+
+    results = []
+    for device in devices:
+        if not device.shutdown_enabled:
+            results.append({
+                "device_id": device.id, "name": device.name,
+                "success": False, "detail": "未启用远程关机",
+            })
+            continue
+        pwd = decrypt(device.shutdown_password_enc) if device.shutdown_auth_type == "password" else ""
+        key = decrypt(device.shutdown_key_enc) if device.shutdown_auth_type == "key" else None
+        ok, detail = await send_shutdown(
+            device.ip, device.shutdown_user, pwd,
+            private_key=key, device_type=device.device_type,
+        )
+        await write_log(db, device.id, "shutdown", "success" if ok else "failure", detail, "manual")
+        results.append({"device_id": device.id, "name": device.name, "success": ok, "detail": detail})
+    return {"total": len(results), "results": results}
 
 
 @router.post("/batch-delete", status_code=200)

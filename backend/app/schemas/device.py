@@ -68,3 +68,13 @@ class BatchDeleteRequest(BaseModel):
 class BatchMoveRequest(BaseModel):
     ids: list[int]
     group_id: Optional[int] = None
+
+
+class BatchWakeRequest(BaseModel):
+    ids: Optional[list[int]] = None
+    group_id: Optional[int] = None
+
+
+class BatchShutdownRequest(BaseModel):
+    ids: Optional[list[int]] = None
+    group_id: Optional[int] = None
