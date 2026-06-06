@@ -33,5 +33,5 @@ class TestBemfaTrigger:
         from backend.app.services.bemfa import _handle_message
         with patch("backend.app.services.wol.send_wol", new_callable=AsyncMock) as mock_wol, \
              patch("backend.app.services.notification.notify_all", new_callable=AsyncMock):
-            await _handle_message("cmd=0", "topic", "AA:BB:CC:DD:EE:01")
+            await _handle_message("cmd=0", "topic", {"device_mac": "AA:BB:CC:DD:EE:01"})
             mock_wol.assert_not_called()

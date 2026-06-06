@@ -37,7 +37,6 @@ async def _bemfa_loop(trigger_id: int, config: dict):
     port = config.get("port", 8344)
     uid = config.get("uid", "")
     topic = config.get("topic", "")
-    device_mac = config.get("device_mac", "")
 
     backoff = 5
     fail_count = 0
@@ -80,7 +79,7 @@ async def _bemfa_loop(trigger_id: int, config: dict):
                 continue
 
             ack_msg = ack.decode("utf-8", errors="ignore").strip()
-            if "cmd=0" not in ack_msg:
+            if "res=1" not in ack_msg:
                 _fail(f"handshake failed: {ack_msg}")
                 if writer:
                     writer.close()
@@ -100,10 +99,10 @@ async def _bemfa_loop(trigger_id: int, config: dict):
                     if not data:
                         break
                     msg = data.decode("utf-8", errors="ignore").strip()
-                    if not msg or msg == "cmd=0":
+                    if not msg or msg.startswith("cmd=0"):
                         continue
                     logger.info("Bemfa [%s]: %s", topic, msg)
-                    await _handle_message(msg, topic, device_mac)
+                    await _handle_message(msg, topic, config)
             finally:
                 ping_task.cancel()
 
@@ -130,7 +129,28 @@ async def _heartbeat(writer: asyncio.StreamWriter):
             break
 
 
-async def _handle_message(msg: str, topic: str, device_mac: str):
+async def _resolve_devices(config: dict) -> list:
+    """Resolve target devices from config (supports device_mac and target_device_ids)."""
+    device_mac = config.get("device_mac", "")
+    target_ids = config.get("target_device_ids", [])
+
+    devices = []
+    async with async_session() as db:
+        if device_mac:
+            device = (await db.execute(
+                select(Device).where(Device.mac == device_mac.upper())
+            )).scalar_one_or_none()
+            if device:
+                devices.append(device)
+        if not devices and target_ids:
+            result = await db.execute(
+                select(Device).where(Device.id.in_(target_ids))
+            )
+            devices = list(result.scalars().all())
+    return devices
+
+
+async def _handle_message(msg: str, topic: str, config: dict):
     if f"topic={topic}&msg=on" in msg:
         action = "wake"
     elif f"topic={topic}&msg=off" in msg:
@@ -138,46 +158,46 @@ async def _handle_message(msg: str, topic: str, device_mac: str):
     else:
         return
 
-    async with async_session() as db:
-        device = None
-        if device_mac:
-            device = (await db.execute(
-                select(Device).where(Device.mac == device_mac.upper())
-            )).scalar_one_or_none()
+    devices = await _resolve_devices(config)
+    if not devices:
+        logger.warning("Bemfa: no target device found for topic %s", topic)
+        return
 
-        if not device:
-            logger.warning("Bemfa: device %s not found", device_mac)
-            return
+    for device in devices:
+        async with async_session() as db:
+            merged = (await db.execute(
+                select(Device).where(Device.id == device.id)
+            )).scalar_one()
 
-        from .log_writer import write_log
-        if action == "wake":
-            from .wol import send_wol
-            ok, detail = await send_wol(device.mac)
-        else:
-            from .shutdown import send_shutdown
-            from ..crypto import decrypt
-            if not device.shutdown_enabled:
-                logger.warning("Bemfa: shutdown not enabled for %s", device.name)
-                return
-            pwd = decrypt(device.shutdown_password_enc) if device.shutdown_auth_type == "password" else ""
-            key = decrypt(device.shutdown_key_enc) if device.shutdown_auth_type == "key" else None
-            ok, detail = await send_shutdown(
-                device.ip, device.shutdown_user, pwd,
-                private_key=key, device_type=device.device_type,
-            )
+            from .log_writer import write_log
+            if action == "wake":
+                from .wol import send_wol
+                ok, detail = await send_wol(merged.mac)
+            else:
+                from .shutdown import send_shutdown
+                from ..crypto import decrypt
+                if not merged.shutdown_enabled:
+                    logger.warning("Bemfa: shutdown not enabled for %s", merged.name)
+                    continue
+                pwd = decrypt(merged.shutdown_password_enc) if merged.shutdown_auth_type == "password" else ""
+                key = decrypt(merged.shutdown_key_enc) if merged.shutdown_auth_type == "key" else None
+                ok, detail = await send_shutdown(
+                    merged.ip, merged.shutdown_user, pwd,
+                    private_key=key, device_type=merged.device_type,
+                )
 
-        await write_log(db, device.id, action, "success" if ok else "failure", detail, "external")
-        if ok:
-            from .ping_monitor import register_pending_check
-            register_pending_check(device.id, action, device.name)
+            await write_log(db, merged.id, action, "success" if ok else "failure", detail, "external")
+            if ok:
+                from .ping_monitor import register_pending_check
+                register_pending_check(merged.id, action, merged.name)
 
-        device_name = device.name
+            device_name = merged.name
 
-    from .notification import notify_all
-    await notify_all(
-        f"巴法云触发 {'成功' if ok else '失败'}",
-        f"设备: {device_name} | 动作: {action} | {detail}",
-    )
+        from .notification import notify_all
+        await notify_all(
+            f"巴法云触发 {'成功' if ok else '失败'}",
+            f"设备: {device_name} | 动作: {action} | {detail}",
+        )
 
 
 def stop_all():

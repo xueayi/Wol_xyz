@@ -42,8 +42,6 @@ async def _mqtt_loop(trigger_id: int, config: dict):
     username = config.get("username")
     password = config.get("password")
     topic = config.get("topic", "wol_xyz/#")
-    device_mac = config.get("device_mac", "")
-
     loop = asyncio.get_event_loop()
 
     def on_connect(client, userdata, flags, rc, properties=None):
@@ -74,7 +72,7 @@ async def _mqtt_loop(trigger_id: int, config: dict):
             except Exception:
                 return
 
-        asyncio.run_coroutine_threadsafe(_handle_mqtt(action, device_mac), loop)
+        asyncio.run_coroutine_threadsafe(_handle_mqtt(action, config), loop)
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     if username:
@@ -111,45 +109,67 @@ async def _mqtt_loop(trigger_id: int, config: dict):
             backoff = min(backoff * 2, 300)
 
 
-async def _handle_mqtt(action: str, device_mac: str):
+async def _resolve_devices(config: dict) -> list:
+    """Resolve target devices from config (supports device_mac and target_device_ids)."""
+    device_mac = config.get("device_mac", "")
+    target_ids = config.get("target_device_ids", [])
+
+    devices = []
     async with async_session() as db:
-        device = None
         if device_mac:
             device = (await db.execute(
                 select(Device).where(Device.mac == device_mac.upper())
             )).scalar_one_or_none()
-        if not device:
-            logger.warning("MQTT: device %s not found", device_mac)
-            return
-
-        from .log_writer import write_log
-        if action == "wake":
-            from .wol import send_wol
-            ok, detail = await send_wol(device.mac)
-        else:
-            from .shutdown import send_shutdown
-            from ..crypto import decrypt
-            if not device.shutdown_enabled:
-                return
-            pwd = decrypt(device.shutdown_password_enc) if device.shutdown_auth_type == "password" else ""
-            key = decrypt(device.shutdown_key_enc) if device.shutdown_auth_type == "key" else None
-            ok, detail = await send_shutdown(
-                device.ip, device.shutdown_user, pwd,
-                private_key=key, device_type=device.device_type,
+            if device:
+                devices.append(device)
+        if not devices and target_ids:
+            result = await db.execute(
+                select(Device).where(Device.id.in_(target_ids))
             )
+            devices = list(result.scalars().all())
+    return devices
 
-        await write_log(db, device.id, action, "success" if ok else "failure", detail, "external")
-        if ok:
-            from .ping_monitor import register_pending_check
-            register_pending_check(device.id, action, device.name)
 
-        device_name = device.name
+async def _handle_mqtt(action: str, config: dict):
+    devices = await _resolve_devices(config)
+    if not devices:
+        logger.warning("MQTT: no target device found (config=%s)", config)
+        return
 
-    from .notification import notify_all
-    await notify_all(
-        f"MQTT 触发 {'成功' if ok else '失败'}",
-        f"设备: {device_name} | 动作: {action} | {detail}",
-    )
+    for device in devices:
+        async with async_session() as db:
+            merged = (await db.execute(
+                select(Device).where(Device.id == device.id)
+            )).scalar_one()
+
+            from .log_writer import write_log
+            if action == "wake":
+                from .wol import send_wol
+                ok, detail = await send_wol(merged.mac)
+            else:
+                from .shutdown import send_shutdown
+                from ..crypto import decrypt
+                if not merged.shutdown_enabled:
+                    continue
+                pwd = decrypt(merged.shutdown_password_enc) if merged.shutdown_auth_type == "password" else ""
+                key = decrypt(merged.shutdown_key_enc) if merged.shutdown_auth_type == "key" else None
+                ok, detail = await send_shutdown(
+                    merged.ip, merged.shutdown_user, pwd,
+                    private_key=key, device_type=merged.device_type,
+                )
+
+            await write_log(db, merged.id, action, "success" if ok else "failure", detail, "external")
+            if ok:
+                from .ping_monitor import register_pending_check
+                register_pending_check(merged.id, action, merged.name)
+
+            device_name = merged.name
+
+        from .notification import notify_all
+        await notify_all(
+            f"MQTT 触发 {'成功' if ok else '失败'}",
+            f"设备: {device_name} | 动作: {action} | {detail}",
+        )
 
 
 def stop_all():

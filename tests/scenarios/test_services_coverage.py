@@ -436,20 +436,19 @@ class TestBemfaService:
         mock_device.name = "Test"
         mock_device.shutdown_enabled = True
 
-        with patch("backend.app.services.bemfa.async_session") as mock_session:
-            mock_db = AsyncMock()
+        with patch("backend.app.services.bemfa._resolve_devices", new_callable=AsyncMock, return_value=[mock_device]):
             mock_result = MagicMock()
-            mock_result.scalar_one_or_none.return_value = mock_device
+            mock_result.scalar_one.return_value = mock_device
+            mock_db = AsyncMock()
             mock_db.execute = AsyncMock(return_value=mock_result)
             mock_db.__aenter__ = AsyncMock(return_value=mock_db)
             mock_db.__aexit__ = AsyncMock(return_value=None)
-            mock_session.return_value = mock_db
-
-            with patch("backend.app.services.wol.send_wol", new_callable=AsyncMock, return_value=(True, "OK")):
-                with patch("backend.app.services.log_writer.write_log", new_callable=AsyncMock):
-                    with patch("backend.app.services.ping_monitor.register_pending_check"):
-                        with patch("backend.app.services.notification.notify_all", new_callable=AsyncMock):
-                            await _handle_message("topic=wol&msg=on", "wol", "AA:BB:CC:DD:EE:01")
+            with patch("backend.app.services.bemfa.async_session", return_value=mock_db):
+                with patch("backend.app.services.wol.send_wol", new_callable=AsyncMock, return_value=(True, "OK")):
+                    with patch("backend.app.services.log_writer.write_log", new_callable=AsyncMock):
+                        with patch("backend.app.services.ping_monitor.register_pending_check"):
+                            with patch("backend.app.services.notification.notify_all", new_callable=AsyncMock):
+                                await _handle_message("topic=wol&msg=on", "wol", {"device_mac": "AA:BB:CC:DD:EE:01"})
 
     @pytest.mark.asyncio
     async def test_handle_message_shutdown(self):
@@ -466,39 +465,31 @@ class TestBemfaService:
         mock_device.shutdown_key_enc = ""
         mock_device.device_type = "linux"
 
-        with patch("backend.app.services.bemfa.async_session") as mock_session:
-            mock_db = AsyncMock()
+        with patch("backend.app.services.bemfa._resolve_devices", new_callable=AsyncMock, return_value=[mock_device]):
             mock_result = MagicMock()
-            mock_result.scalar_one_or_none.return_value = mock_device
+            mock_result.scalar_one.return_value = mock_device
+            mock_db = AsyncMock()
             mock_db.execute = AsyncMock(return_value=mock_result)
             mock_db.__aenter__ = AsyncMock(return_value=mock_db)
             mock_db.__aexit__ = AsyncMock(return_value=None)
-            mock_session.return_value = mock_db
-
-            with patch("backend.app.services.shutdown.send_shutdown", new_callable=AsyncMock, return_value=(True, "OK")):
-                with patch("backend.app.crypto.decrypt", return_value="pass"):
-                    with patch("backend.app.services.log_writer.write_log", new_callable=AsyncMock):
-                        with patch("backend.app.services.ping_monitor.register_pending_check"):
-                            with patch("backend.app.services.notification.notify_all", new_callable=AsyncMock):
-                                await _handle_message("topic=wol&msg=off", "wol", "AA:BB:CC:DD:EE:01")
+            with patch("backend.app.services.bemfa.async_session", return_value=mock_db):
+                with patch("backend.app.services.shutdown.send_shutdown", new_callable=AsyncMock, return_value=(True, "OK")):
+                    with patch("backend.app.crypto.decrypt", return_value="pass"):
+                        with patch("backend.app.services.log_writer.write_log", new_callable=AsyncMock):
+                            with patch("backend.app.services.ping_monitor.register_pending_check"):
+                                with patch("backend.app.services.notification.notify_all", new_callable=AsyncMock):
+                                    await _handle_message("topic=wol&msg=off", "wol", {"device_mac": "AA:BB:CC:DD:EE:01"})
 
     @pytest.mark.asyncio
     async def test_handle_message_unknown_msg(self):
         from backend.app.services.bemfa import _handle_message
-        await _handle_message("topic=wol&msg=unknown", "wol", "AA:BB:CC:DD:EE:01")
+        await _handle_message("topic=wol&msg=unknown", "wol", {"device_mac": "AA:BB:CC:DD:EE:01"})
 
     @pytest.mark.asyncio
     async def test_handle_message_device_not_found(self):
         from backend.app.services.bemfa import _handle_message
-        with patch("backend.app.services.bemfa.async_session") as mock_session:
-            mock_db = AsyncMock()
-            mock_result = MagicMock()
-            mock_result.scalar_one_or_none.return_value = None
-            mock_db.execute = AsyncMock(return_value=mock_result)
-            mock_db.__aenter__ = AsyncMock(return_value=mock_db)
-            mock_db.__aexit__ = AsyncMock(return_value=None)
-            mock_session.return_value = mock_db
-            await _handle_message("topic=wol&msg=on", "wol", "FF:FF:FF:FF:FF:FF")
+        with patch("backend.app.services.bemfa._resolve_devices", new_callable=AsyncMock, return_value=[]):
+            await _handle_message("topic=wol&msg=on", "wol", {"device_mac": "FF:FF:FF:FF:FF:FF"})
 
     def test_stop_all(self):
         from backend.app.services.bemfa import stop_all, _tasks, _status
@@ -538,15 +529,15 @@ class TestBemfaService:
         mock_device.name = "Test"
         mock_device.shutdown_enabled = False
 
-        with patch("backend.app.services.bemfa.async_session") as mock_session:
-            mock_db = AsyncMock()
+        with patch("backend.app.services.bemfa._resolve_devices", new_callable=AsyncMock, return_value=[mock_device]):
             mock_result = MagicMock()
-            mock_result.scalar_one_or_none.return_value = mock_device
+            mock_result.scalar_one.return_value = mock_device
+            mock_db = AsyncMock()
             mock_db.execute = AsyncMock(return_value=mock_result)
             mock_db.__aenter__ = AsyncMock(return_value=mock_db)
             mock_db.__aexit__ = AsyncMock(return_value=None)
-            mock_session.return_value = mock_db
-            await _handle_message("topic=wol&msg=off", "wol", "AA:BB:CC:DD:EE:01")
+            with patch("backend.app.services.bemfa.async_session", return_value=mock_db):
+                await _handle_message("topic=wol&msg=off", "wol", {"device_mac": "AA:BB:CC:DD:EE:01"})
 
 
 # ============ MQTT SERVICE ============
@@ -567,20 +558,19 @@ class TestMqttService:
         mock_device.mac = "AA:BB:CC:DD:EE:01"
         mock_device.name = "Test"
 
-        with patch("backend.app.services.mqtt.async_session") as mock_session:
-            mock_db = AsyncMock()
+        with patch("backend.app.services.mqtt._resolve_devices", new_callable=AsyncMock, return_value=[mock_device]):
             mock_result = MagicMock()
-            mock_result.scalar_one_or_none.return_value = mock_device
+            mock_result.scalar_one.return_value = mock_device
+            mock_db = AsyncMock()
             mock_db.execute = AsyncMock(return_value=mock_result)
             mock_db.__aenter__ = AsyncMock(return_value=mock_db)
             mock_db.__aexit__ = AsyncMock(return_value=None)
-            mock_session.return_value = mock_db
-
-            with patch("backend.app.services.wol.send_wol", new_callable=AsyncMock, return_value=(True, "OK")):
-                with patch("backend.app.services.log_writer.write_log", new_callable=AsyncMock):
-                    with patch("backend.app.services.ping_monitor.register_pending_check"):
-                        with patch("backend.app.services.notification.notify_all", new_callable=AsyncMock):
-                            await _handle_mqtt("wake", "AA:BB:CC:DD:EE:01")
+            with patch("backend.app.services.mqtt.async_session", return_value=mock_db):
+                with patch("backend.app.services.wol.send_wol", new_callable=AsyncMock, return_value=(True, "OK")):
+                    with patch("backend.app.services.log_writer.write_log", new_callable=AsyncMock):
+                        with patch("backend.app.services.ping_monitor.register_pending_check"):
+                            with patch("backend.app.services.notification.notify_all", new_callable=AsyncMock):
+                                await _handle_mqtt("wake", {"device_mac": "AA:BB:CC:DD:EE:01"})
 
     @pytest.mark.asyncio
     async def test_handle_mqtt_shutdown(self):
@@ -597,34 +587,26 @@ class TestMqttService:
         mock_device.shutdown_key_enc = ""
         mock_device.device_type = "linux"
 
-        with patch("backend.app.services.mqtt.async_session") as mock_session:
-            mock_db = AsyncMock()
+        with patch("backend.app.services.mqtt._resolve_devices", new_callable=AsyncMock, return_value=[mock_device]):
             mock_result = MagicMock()
-            mock_result.scalar_one_or_none.return_value = mock_device
+            mock_result.scalar_one.return_value = mock_device
+            mock_db = AsyncMock()
             mock_db.execute = AsyncMock(return_value=mock_result)
             mock_db.__aenter__ = AsyncMock(return_value=mock_db)
             mock_db.__aexit__ = AsyncMock(return_value=None)
-            mock_session.return_value = mock_db
-
-            with patch("backend.app.services.shutdown.send_shutdown", new_callable=AsyncMock, return_value=(True, "OK")):
-                with patch("backend.app.crypto.decrypt", return_value="pass"):
-                    with patch("backend.app.services.log_writer.write_log", new_callable=AsyncMock):
-                        with patch("backend.app.services.ping_monitor.register_pending_check"):
-                            with patch("backend.app.services.notification.notify_all", new_callable=AsyncMock):
-                                await _handle_mqtt("shutdown", "AA:BB:CC:DD:EE:01")
+            with patch("backend.app.services.mqtt.async_session", return_value=mock_db):
+                with patch("backend.app.services.shutdown.send_shutdown", new_callable=AsyncMock, return_value=(True, "OK")):
+                    with patch("backend.app.crypto.decrypt", return_value="pass"):
+                        with patch("backend.app.services.log_writer.write_log", new_callable=AsyncMock):
+                            with patch("backend.app.services.ping_monitor.register_pending_check"):
+                                with patch("backend.app.services.notification.notify_all", new_callable=AsyncMock):
+                                    await _handle_mqtt("shutdown", {"device_mac": "AA:BB:CC:DD:EE:01"})
 
     @pytest.mark.asyncio
     async def test_handle_mqtt_device_not_found(self):
         from backend.app.services.mqtt import _handle_mqtt
-        with patch("backend.app.services.mqtt.async_session") as mock_session:
-            mock_db = AsyncMock()
-            mock_result = MagicMock()
-            mock_result.scalar_one_or_none.return_value = None
-            mock_db.execute = AsyncMock(return_value=mock_result)
-            mock_db.__aenter__ = AsyncMock(return_value=mock_db)
-            mock_db.__aexit__ = AsyncMock(return_value=None)
-            mock_session.return_value = mock_db
-            await _handle_mqtt("wake", "FF:FF:FF:FF:FF:FF")
+        with patch("backend.app.services.mqtt._resolve_devices", new_callable=AsyncMock, return_value=[]):
+            await _handle_mqtt("wake", {"device_mac": "FF:FF:FF:FF:FF:FF"})
 
     def test_stop_all(self):
         from backend.app.services.mqtt import stop_all, _tasks, _status
@@ -664,15 +646,15 @@ class TestMqttService:
         mock_device.name = "Test"
         mock_device.shutdown_enabled = False
 
-        with patch("backend.app.services.mqtt.async_session") as mock_session:
-            mock_db = AsyncMock()
+        with patch("backend.app.services.mqtt._resolve_devices", new_callable=AsyncMock, return_value=[mock_device]):
             mock_result = MagicMock()
-            mock_result.scalar_one_or_none.return_value = mock_device
+            mock_result.scalar_one.return_value = mock_device
+            mock_db = AsyncMock()
             mock_db.execute = AsyncMock(return_value=mock_result)
             mock_db.__aenter__ = AsyncMock(return_value=mock_db)
             mock_db.__aexit__ = AsyncMock(return_value=None)
-            mock_session.return_value = mock_db
-            await _handle_mqtt("shutdown", "AA:BB:CC:DD:EE:01")
+            with patch("backend.app.services.mqtt.async_session", return_value=mock_db):
+                await _handle_mqtt("shutdown", {"device_mac": "AA:BB:CC:DD:EE:01"})
 
 
 # ============ TELEGRAM BOT ============
