@@ -39,7 +39,7 @@ services:
     image: xueayis/wol-xyz:latest
     container_name: wol-xyz
     network_mode: host
-    restart: unless-stopped
+    restart: always
     volumes:
       - ./data:/app/data
     environment:
