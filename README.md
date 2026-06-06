@@ -6,7 +6,7 @@
 [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Docker](https://img.shields.io/badge/Docker-host_network-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-244_passing-brightgreen)](tests/)
+
 
 > 轻量级局域网设备远程管理工具 — WOL 开机 · SSH 关机 · 实时监控 · 定时任务 · 多渠道触发
 
@@ -103,11 +103,8 @@ cd frontend && npm install && npm run dev
 # 安装测试依赖
 pip install -r tests/requirements-test.txt
 
-# 运行全部测试（244 个用例，覆盖率 90%）
+# 运行全部测试
 pytest tests/ -v
-
-# 带覆盖率报告
-pytest tests/ --rootdir=. --cov --cov-report=term-missing
 
 # 按场景选择
 pytest tests/ -m web_api          # Web API
