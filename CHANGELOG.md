@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-06-06
+
+### Added
+
+- 测试覆盖率从 40% 提升至 90%（244 个测试用例）
+- 新增路由层全覆盖测试：auth/groups/logs/dashboard/devices/schedules/channels/announcements/triggers/settings
+- 新增服务层单元测试：wol/shutdown/notification/bemfa/mqtt/telegram_bot/ping_monitor/scheduler
+- 新增 crypto/auth/proxy/config 基础模块单元测试
+- `.coveragerc` 配置 greenlet+thread 并发追踪，正确统计 async 路由
+- README 添加 `run.sh` 本地开发使用说明
+
+### Changed
+
+- CI 适配 `.coveragerc`，统一覆盖率配置
+- 排除 `scanner.py`（纯网络扫描）和不可测试的 I/O 轮询循环代码
+
 ## [1.1.0] - 2026-06-06
 
 ### Added

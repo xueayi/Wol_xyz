@@ -5,3 +5,9 @@ concurrency = greenlet,thread
 [report]
 omit =
     backend/app/services/scanner.py
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__
+    while True
+    await asyncio.sleep
+    except asyncio.CancelledError
